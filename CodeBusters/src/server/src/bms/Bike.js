@@ -22,6 +22,7 @@ class Bike {
         this.type = type;
         this.status = Bike.STATUSES.AVAILABLE; // All bikes start as available
         this.reservationExpiry = null; // No reservation initially
+        this.reservedBy = null; // Track who reserved the bike
         this.createdAt = new Date();
         this.updatedAt = new Date();
     }
@@ -57,6 +58,37 @@ class Bike {
     isReservationExpired() {
         if (!this.reservationExpiry) return false;
         return new Date() > this.reservationExpiry;
+    }
+
+    // Reserve a bike for a user
+    reserve(userId, expiresAfterMinutes = 15) {
+        // Step 1: Validate current state
+        if (this.status !== Bike.STATUSES.AVAILABLE) {
+            return {
+                success: false,
+                message: `Cannot reserve bike. Current status: ${this.status}`
+            };
+        }
+
+        // Step 2: Calculate expiry time
+        const now = new Date();
+        const expiryTime = new Date(now.getTime() + (expiresAfterMinutes * 60 * 1000));
+
+        // Step 3: Update bike state
+        this.status = Bike.STATUSES.RESERVED;
+        this.reservedBy = userId;
+        this.reservationExpiry = expiryTime;
+        this.updatedAt = new Date();
+
+        // Step 4: Return success
+        return {
+            success: true,
+            message: 'Bike reserved successfully',
+            data: {
+                reservedBy: this.reservedBy,
+                expiresAt: this.reservationExpiry
+            }
+        };
     }
 }
 
