@@ -14,7 +14,7 @@ This is the Node.js backend server for the CodeBusters Bike Management System (B
 
 1. Navigate to the backend directory:
    ```bash
-   cd backend
+   cd server
    ```
 
 2. Install dependencies:

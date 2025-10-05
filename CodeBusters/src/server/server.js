@@ -25,16 +25,33 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // Initialize database tables
 function initializeDatabase() {
-    // Users table
+    // Drop existing users table to reset it
+    //Uncomment the below lines if you want to reset the users table on server restart
+    
+    // db.run(`DROP TABLE IF EXISTS users`, (err) => {
+    //     if (err) {
+    //         console.error('Error dropping users table:', err.message);
+    //     } else {
+    //         console.log('Existing users table dropped');
+    //     }
+    // });
+
+    // Users table - simplified with only username and password
     db.run(`
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
             password TEXT NOT NULL,
+            role TEXT DEFAULT 'rider',
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
-    `);
+    `, (err) => {
+        if (err) {
+            console.error('Error creating users table:', err.message);
+        } else {
+            console.log('Users table created successfully');
+        }
+    });
 
     // Bikes table for BMS (Bike Management System)
     db.run(`
@@ -64,6 +81,11 @@ function initializeDatabase() {
             FOREIGN KEY (bike_id) REFERENCES bikes (id)
         )
     `);
+
+    // // Insert a default operator user for testing
+    // db.run(`
+    //     INSERT INTO users (username, password, role) VALUES ('ops', 'baba', 'operator')
+    // `);
 
     console.log('Database tables initialized');
 }
@@ -96,7 +118,7 @@ app.get('/api/bikes', (req, res) => {
 
 // Get all users
 app.get('/api/users', (req, res) => {
-    db.all('SELECT id, username, email, created_at FROM users', (err, rows) => {
+    db.all('SELECT id, username, role, created_at FROM users', (err, rows) => {
         if (err) {
             res.status(500).json({ error: err.message });
             return;
@@ -139,6 +161,104 @@ app.post('/api/bikes', (req, res) => {
             });
         }
     );
+});
+
+// Registration endpoint
+app.post('/api/register', (req, res) => {
+    const { username, password, role = 'rider' } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Username and password are required' 
+        });
+    }
+    
+    // Insert new user into database
+    db.run(
+        'INSERT INTO users (username, password, role) VALUES (?, ?, ?)',
+        [username, password, role],
+        function(err) {
+            if (err) {
+                if (err.message.includes('UNIQUE constraint failed')) {
+                    return res.status(409).json({ 
+                        success: false, 
+                        message: 'Username already exists' 
+                    });
+                }
+                console.error('Database error:', err.message);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Internal server error 1' 
+                });
+            }
+            
+            res.json({
+                success: true,
+                message: 'User registered successfully',
+                user: {
+                    id: this.lastID,
+                    username: username,
+                    role: role
+                }
+            });
+        }
+    );
+});
+
+// Login endpoint
+app.post('/api/login', (req, res) => {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+        return res.status(400).json({ 
+            success: false, 
+            message: 'Username and password are required' 
+        });
+    }
+    
+    // Query database for user with matching username and password
+    db.get(
+        'SELECT id, username, role FROM users WHERE username = ? AND password = ?',
+        [username, password],
+        (err, row) => {
+            if (err) {
+                console.error('Database error:', err.message);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Internal server error 2' 
+                });
+            }
+            
+            if (row) {
+                // User found - login successful
+                res.json({
+                    success: true,
+                    message: 'Login successful',
+                    user: {
+                        id: row.id,
+                        username: row.username,
+                        role: row.role
+                    }
+                });
+            } else {
+                // User not found or password incorrect
+                res.status(401).json({
+                    success: false,
+                    message: 'Invalid username or password'
+                });
+            }
+        }
+    );
+});
+
+// Temporary endpoint for successful login redirect
+app.get('/api/temporary', (req, res) => {
+    res.json({
+        message: 'Welcome! You have successfully logged in.',
+        timestamp: new Date().toISOString(),
+        status: 'authenticated'
+    });
 });
 
 // Health check endpoint

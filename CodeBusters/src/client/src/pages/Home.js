@@ -4,7 +4,6 @@ import Navbar from '../components/Navbar';
 const Home = () => {
     return (
         <>
-            <Navbar />
             <div>
                 <p>CodeBusters Home</p>
             </div>
