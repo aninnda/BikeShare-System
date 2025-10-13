@@ -1,6 +1,7 @@
 /**
  * Bike entity for the BMS (Bike Management System)
  * Handles bike states and transitions according to BMS requirements
+ * Includes sanity checking for valid state transitions
  */
 class Bike {
     // Valid bike statuses as per R-BMS requirements
@@ -11,6 +12,14 @@ class Bike {
         MAINTENANCE: 'maintenance'
     };
 
+    // Valid state transitions (sanity checking)
+    static VALID_TRANSITIONS = {
+        'available': ['reserved', 'on_trip', 'maintenance'],
+        'reserved': ['available', 'on_trip', 'maintenance'],
+        'on_trip': ['available', 'maintenance'],
+        'maintenance': ['available']
+    };
+
     // Valid bike types
     static TYPES = {
         STANDARD: 'standard',
@@ -18,6 +27,14 @@ class Bike {
     };
 
     constructor(id, type = Bike.TYPES.STANDARD) {
+        // Sanity check: validate input
+        if (!id || typeof id !== 'string') {
+            throw new Error('Bike ID must be a non-empty string');
+        }
+        if (!Object.values(Bike.TYPES).includes(type)) {
+            throw new Error(`Invalid bike type: ${type}`);
+        }
+
         this.id = id;
         this.type = type;
         this.status = Bike.STATUSES.AVAILABLE; // All bikes start as available
@@ -49,6 +66,25 @@ class Bike {
         return this.status === Bike.STATUSES.AVAILABLE;
     }
 
+    // Sanity checking: validate state transitions
+    isValidTransition(newStatus) {
+        if (!Object.values(Bike.STATUSES).includes(newStatus)) {
+            return false;
+        }
+        const validTransitions = Bike.VALID_TRANSITIONS[this.status];
+        return validTransitions && validTransitions.includes(newStatus);
+    }
+
+    // Sanity checking: safe status change
+    changeStatus(newStatus, reason = 'status change') {
+        if (!this.isValidTransition(newStatus)) {
+            throw new Error(`Invalid transition from ${this.status} to ${newStatus} (${reason})`);
+        }
+        this.status = newStatus;
+        this.updatedAt = new Date();
+        return true;
+    }
+
     // Check if bike is currently reserved
     isReserved() {
         return this.status === Bike.STATUSES.RESERVED;
@@ -74,7 +110,14 @@ class Bike {
         const now = new Date();
         const expiryTime = new Date(now.getTime() + (expiresAfterMinutes * 60 * 1000));
 
-        // Step 3: Update bike state
+        // Step 3: Update bike state with sanity checking
+        if (!this.isValidTransition(Bike.STATUSES.RESERVED)) {
+            return {
+                success: false,
+                message: `Invalid state transition from ${this.status} to reserved`
+            };
+        }
+
         this.status = Bike.STATUSES.RESERVED;
         this.reservedBy = userId;
         this.reservationExpiry = expiryTime;

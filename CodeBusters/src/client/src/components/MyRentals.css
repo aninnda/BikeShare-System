@@ -1,0 +1,360 @@
+.my-rentals-container {
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+    min-height: 100vh;
+    color: white;
+}
+
+.header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.header h1 {
+    font-size: 2.5rem;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+}
+
+.header p {
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 15px;
+    backdrop-filter: blur(10px);
+    font-size: 1.2rem;
+}
+
+.error {
+    text-align: center;
+    padding: 20px;
+    background: rgba(255,107,107,0.8);
+    border-radius: 15px;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.no-reservations {
+    text-align: center;
+    padding: 60px 40px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.no-reservations h3 {
+    font-size: 2rem;
+    margin-bottom: 20px;
+    color: #f39c12;
+}
+
+.no-reservations p {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+    opacity: 0.9;
+}
+
+.reservations-section h2 {
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 1.8rem;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+}
+
+.reservations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: 25px;
+}
+
+.reservation-card {
+    background: rgba(255,255,255,0.95);
+    color: #333;
+    border-radius: 20px;
+    padding: 25px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.2);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.reservation-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 50px rgba(0,0,0,0.2);
+}
+
+.reservation-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.reservation-header h3 {
+    margin: 0;
+    color: #2c3e50;
+    font-size: 1.4rem;
+    font-weight: bold;
+}
+
+.bike-type-badge {
+    padding: 8px 15px;
+    border-radius: 20px;
+    color: white;
+    font-weight: bold;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+
+.bike-type-badge.standard {
+    background: linear-gradient(135deg, #74b9ff 0%, #0984e3 100%);
+}
+
+.bike-type-badge.e-bike {
+    background: linear-gradient(135deg, #fd79a8 0%, #e84393 100%);
+}
+
+.reservation-details {
+    margin-bottom: 25px;
+}
+
+.station-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border-left: 4px solid #74b9ff;
+}
+
+.station-info h4 {
+    margin: 0 0 8px 0;
+    color: #2c3e50;
+    font-size: 1.1rem;
+}
+
+.address {
+    margin: 0;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.timing-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 12px;
+}
+
+.reserved-at, .expires-at {
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.countdown-timer {
+    font-size: 1.2rem;
+    font-weight: bold;
+    padding: 10px;
+    text-align: center;
+    background: rgba(255,255,255,0.8);
+    border-radius: 10px;
+    margin-top: 5px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.reservation-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.cancel-reservation-btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.cancel-reservation-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(231, 76, 60, 0.3);
+}
+
+.rent-now-btn {
+    flex: 1;
+    min-width: 140px;
+    padding: 12px 20px;
+    background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.rent-now-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0, 184, 148, 0.3);
+}
+
+/* Active Rental Section */
+.active-rental-card {
+    margin-top: 30px !important;
+    padding: 25px !important;
+    background: linear-gradient(135deg, #0abde3, #00d2ff) !important;
+    border-radius: 15px !important;
+    color: #003249 !important;
+    box-shadow: 0 8px 32px rgba(10, 189, 227, 0.3) !important;
+    border: 3px solid #ffffff40 !important;
+    backdrop-filter: blur(10px) !important;
+    animation: pulse-glow 2s ease-in-out infinite alternate;
+}
+
+.active-rental-card h2 {
+    margin: 0 0 20px 0 !important;
+    font-size: 1.8rem !important;
+    font-weight: bold !important;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.active-rental-card h3 {
+    margin: 0 0 10px 0 !important;
+    font-size: 1.4rem !important;
+    font-weight: 600 !important;
+}
+
+.active-rental-card p {
+    margin: 5px 0 !important;
+    font-size: 1rem !important;
+    opacity: 0.9 !important;
+}
+
+.active-rental-info {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 20px !important;
+}
+
+.active-rental-details {
+    flex: 1 !important;
+    min-width: 200px !important;
+}
+
+.active-rental-timer {
+    text-align: right !important;
+    min-width: 150px !important;
+}
+
+.active-rental-timer div[style*="fontSize"] {
+    font-size: 2rem !important;
+    font-weight: 900 !important;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3) !important;
+    margin-bottom: 15px !important;
+}
+
+@keyframes pulse-glow {
+    0% {
+        box-shadow: 0 8px 32px rgba(10, 189, 227, 0.3);
+        transform: scale(1);
+    }
+    100% {
+        box-shadow: 0 12px 40px rgba(10, 189, 227, 0.5);
+        transform: scale(1.02);
+    }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .my-rentals-container {
+        padding: 15px;
+    }
+    
+    .reservations-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .reservation-actions {
+        flex-direction: column;
+    }
+    
+    .cancel-reservation-btn,
+    .rent-now-btn {
+        min-width: auto;
+    }
+    
+    .header h1 {
+        font-size: 2rem;
+    }
+    
+    .timing-info {
+        text-align: center;
+    }
+    
+    .active-rental-info {
+        flex-direction: column !important;
+        text-align: center !important;
+    }
+    
+    .active-rental-timer {
+        text-align: center !important;
+    }
+}
+
+/* Enhanced timer styling */
+.active-rental-card .active-rental-timer {
+    position: relative;
+}
+
+.active-rental-card .active-rental-timer::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: -5px;
+    right: -5px;
+    bottom: -5px;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4);
+    border-radius: 15px;
+    opacity: 0.1;
+    animation: glow 3s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+    0% { opacity: 0.1; transform: scale(1); }
+    100% { opacity: 0.3; transform: scale(1.02); }
+}
+
+@keyframes pulse {
+    0% { 
+        transform: scale(1.05); 
+        box-shadow: 0 10px 30px rgba(231,76,60,0.5), inset 0 2px 10px rgba(255,255,255,0.2);
+    }
+    50% { 
+        transform: scale(1.08); 
+        box-shadow: 0 15px 40px rgba(231,76,60,0.8), inset 0 2px 15px rgba(255,255,255,0.3);
+    }
+    100% { 
+        transform: scale(1.05); 
+        box-shadow: 0 10px 30px rgba(231,76,60,0.5), inset 0 2px 10px rgba(255,255,255,0.2);
+    }
+}

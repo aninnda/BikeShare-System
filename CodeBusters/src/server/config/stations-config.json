@@ -1,0 +1,566 @@
+{
+  "version": "1.0",
+  "lastUpdated": "2025-10-09T00:00:00Z",
+  "city": "Montreal",
+  "country": "Canada",
+  "stations": [
+    {
+      "id": "STN001",
+      "name": "Concordia University - Hall Building",
+      "status": "occupied",
+      "latitude": 45.4973,
+      "longitude": -73.5792,
+      "address": "1455 De Maisonneuve Blvd W, Montreal, QC H3G 1M8",
+      "capacity": 15,
+      "reservationHoldTimeMinutes": 15,
+      "bikes": [
+        {
+          "id": "BIKE001",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE002",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE003",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE067",
+          "type": "standard",
+          "status": "maintenance"
+        },
+        {
+          "id": "BIKE068",
+          "type": "e-bike",
+          "status": "maintenance"
+        }
+      ]
+    },
+    {
+      "id": "STN002",
+      "name": "Place du Canada",
+      "status": "full",
+      "latitude": 45.5017,
+      "longitude": -73.5673,
+      "address": "1010 De La Gauchetière St W, Montreal, QC H3B 2N2",
+      "capacity": 4,
+      "reservationHoldTimeMinutes": 20,
+      "bikes": [
+        {
+          "id": "BIKE004",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE005",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE006",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE007",
+          "type": "e-bike",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "id": "STN003",
+      "name": "Old Port Montreal",
+      "status": "occupied",
+      "latitude": 45.5088,
+      "longitude": -73.5541,
+      "address": "333 De la Commune St W, Montreal, QC H2Y 2E2",
+      "capacity": 12,
+      "reservationHoldTimeMinutes": 15,
+      "bikes": [
+        {
+          "id": "BIKE008",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE009",
+          "type": "standard",
+          "status": "maintenance"
+        }
+      ]
+    },
+    {
+      "id": "STN004",
+      "name": "Parc La Fontaine",
+      "status": "out_of_service",
+      "latitude": 45.5225,
+      "longitude": -73.5692,
+      "address": "3819 Calixa-Lavallée Ave, Montreal, QC H2L 3A7",
+      "capacity": 10,
+      "reservationHoldTimeMinutes": 15,
+      "bikes": []
+    },
+    {
+      "id": "STN005",
+      "name": "Atwater Market",
+      "status": "occupied",
+      "latitude": 45.4761,
+      "longitude": -73.5844,
+      "address": "138 Atwater Ave, Montreal, QC H4C 2G3",
+      "capacity": 18,
+      "reservationHoldTimeMinutes": 15,
+      "bikes": [
+        {
+          "id": "BIKE069",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE070",
+          "type": "e-bike",
+          "status": "maintenance"
+        },
+        {
+          "id": "BIKE071",
+          "type": "standard",
+          "status": "maintenance"
+        },
+        {
+          "id": "BIKE072",
+          "type": "e-bike",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "id": "STN006",
+      "name": "McGill University - Roddick Gates",
+      "status": "full",
+      "latitude": 45.5048,
+      "longitude": -73.5762,
+      "address": "845 Sherbrooke St W, Montreal, QC H3A 0G4",
+      "capacity": 8,
+      "reservationHoldTimeMinutes": 20,
+      "bikes": [
+        {
+          "id": "BIKE010",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE011",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE012",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE013",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE014",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE015",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE016",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE017",
+          "type": "e-bike",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "id": "STN007",
+      "name": "Mont-Royal Metro Station",
+      "status": "occupied",
+      "latitude": 45.5196,
+      "longitude": -73.5816,
+      "address": "1175 Mont-Royal Ave E, Montreal, QC H2J 1Y7",
+      "capacity": 12,
+      "reservationHoldTimeMinutes": 15,
+      "bikes": [
+        {
+          "id": "BIKE018",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE019",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE020",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE021",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE022",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE076",
+          "type": "e-bike",
+          "status": "maintenance"
+        }
+      ]
+    },
+    {
+      "id": "STN008",
+      "name": "Quartier des Spectacles",
+      "status": "occupied",
+      "latitude": 45.508,
+      "longitude": -73.5656,
+      "address": "175 Sainte-Catherine St W, Montreal, QC H2X 1Z8",
+      "capacity": 20,
+      "reservationHoldTimeMinutes": 25,
+      "bikes": [
+        {
+          "id": "BIKE023",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE024",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE025",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE026",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE027",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE028",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE029",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE030",
+          "type": "standard",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "id": "STN009",
+      "name": "Olympic Stadium",
+      "status": "empty",
+      "latitude": 45.5581,
+      "longitude": -73.5515,
+      "address": "4545 Pierre-de Coubertin Ave, Montreal, QC H1V 0B2",
+      "capacity": 15,
+      "reservationHoldTimeMinutes": 20,
+      "bikes": []
+    },
+    {
+      "id": "STN010",
+      "name": "Jean-Talon Market",
+      "status": "full",
+      "latitude": 45.5353,
+      "longitude": -73.618,
+      "address": "7070 Henri Julien Ave, Montreal, QC H2S 3S3",
+      "capacity": 6,
+      "reservationHoldTimeMinutes": 15,
+      "bikes": [
+        {
+          "id": "BIKE031",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE032",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE033",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE034",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE035",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE036",
+          "type": "e-bike",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "id": "STN011",
+      "name": "Biodome de Montreal",
+      "status": "occupied",
+      "latitude": 45.5597,
+      "longitude": -73.5496,
+      "address": "4777 Pierre-de Coubertin Ave, Montreal, QC H1V 1B3",
+      "capacity": 10,
+      "reservationHoldTimeMinutes": 15,
+      "bikes": [
+        {
+          "id": "BIKE037",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE038",
+          "type": "standard",
+          "status": "maintenance"
+        },
+        {
+          "id": "BIKE039",
+          "type": "e-bike",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "id": "STN012",
+      "name": "Plateau-Mont-Royal - Parc Laurier",
+      "status": "occupied",
+      "latitude": 45.5267,
+      "longitude": -73.5878,
+      "address": "3830 Laurier Ave E, Montreal, QC H2L 4K6",
+      "capacity": 14,
+      "reservationHoldTimeMinutes": 20,
+      "bikes": [
+        {
+          "id": "BIKE040",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE041",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE042",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE043",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE044",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE045",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE046",
+          "type": "standard",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "id": "STN013",
+      "name": "Westmount Park",
+      "status": "out_of_service",
+      "latitude": 45.4889,
+      "longitude": -73.5969,
+      "address": "4574 Sherbrooke St W, Westmount, QC H3Z 1E7",
+      "capacity": 8,
+      "reservationHoldTimeMinutes": 15,
+      "bikes": [
+        {
+          "id": "BIKE073",
+          "type": "standard",
+          "status": "maintenance"
+        },
+        {
+          "id": "BIKE074",
+          "type": "e-bike",
+          "status": "maintenance"
+        },
+        {
+          "id": "BIKE075",
+          "type": "standard",
+          "status": "maintenance"
+        }
+      ]
+    },
+    {
+      "id": "STN014",
+      "name": "Berri-UQAM Metro Station",
+      "status": "full",
+      "latitude": 45.5154,
+      "longitude": -73.5601,
+      "address": "1717 Berri St, Montreal, QC H2L 4E9",
+      "capacity": 16,
+      "reservationHoldTimeMinutes": 30,
+      "bikes": [
+        {
+          "id": "BIKE047",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE048",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE049",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE050",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE051",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE052",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE053",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE054",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE055",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE056",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE057",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE058",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE059",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE060",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE061",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE062",
+          "type": "standard",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "id": "STN015",
+      "name": "Lachine Canal - Atwater",
+      "status": "occupied",
+      "latitude": 45.4739,
+      "longitude": -73.5854,
+      "address": "2001 Saint-Patrick St, Montreal, QC H3K 3C8",
+      "capacity": 12,
+      "reservationHoldTimeMinutes": 20,
+      "bikes": [
+        {
+          "id": "BIKE063",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE064",
+          "type": "e-bike",
+          "status": "available"
+        },
+        {
+          "id": "BIKE065",
+          "type": "standard",
+          "status": "available"
+        },
+        {
+          "id": "BIKE066",
+          "type": "e-bike",
+          "status": "maintenance"
+        }
+      ]
+    }
+  ]
+}

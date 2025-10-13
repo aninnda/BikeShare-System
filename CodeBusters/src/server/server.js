@@ -1,11 +1,68 @@
+// ...existing code...
+
+// (Place this route after all initialization and middleware, with the other app.get routes)
+
+// Notifications: Get empty/full docking station notifications for user profile
+// This must be after app, bmsManager, and all middleware are initialized
+
+// ...existing code...
+
+// (Insert here, after all other app.get/app.post routes, but before app.listen)
+
+app.get('/api/notifications/stations', (req, res) => {
+    try {
+        const stations = bmsManager.listAllStations();
+        const notifications = [];
+
+        stations.forEach(station => {
+            if (station.isEmpty) {
+                notifications.push({
+                    type: 'station_empty',
+                    stationId: station.id,
+                    stationName: station.name,
+                    message: `Docking station "${station.name}" is currently empty. No bikes available.`,
+                    timestamp: new Date().toISOString(),
+                });
+            }
+            if (station.isFull) {
+                notifications.push({
+                    type: 'station_full',
+                    stationId: station.id,
+                    stationName: station.name,
+                    message: `Docking station "${station.name}" is currently full. No docks available.`,
+                    timestamp: new Date().toISOString(),
+                });
+            }
+        });
+
+        res.json({
+            success: true,
+            notifications,
+            total: notifications.length
+        });
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Error retrieving station notifications',
+            error: error.message
+        });
+    }
+});
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
 const path = require('path');
 require('dotenv').config();
 
+// Import BMS components for R-BMS-02 implementation
+const BMSManager = require('./src/bms/BMSManager');
+const { BMS_OPERATIONS, HTTP_STATUS } = require('./config/constants');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Initialize BMS Manager for R-BMS-02 compliance
+const bmsManager = new BMSManager();
 
 // Middleware
 app.use(cors()); // Enable CORS for all origins aka communicaion with frontend
@@ -88,17 +145,70 @@ function initializeDatabase() {
     // `);
 
     console.log('Database tables initialized');
+    
+    // Initialize stations and bikes from config
+    initializeStationsFromConfig();
+}
+
+// Initialize BMS demo data for R-BMS-02 testing
+
+// Load all stations and bikes from stations-config.json at startup
+const fs = require('fs');
+const Station = require('./src/bms/Station');
+const Bike = require('./src/bms/Bike');
+
+function initializeStationsFromConfig() {
+    const configPath = path.join(__dirname, 'config', 'stations-config.json');
+    const configData = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configData);
+    if (!config.stations) {
+        console.error('No stations found in config!');
+        return;
+    }
+    bmsManager.stations.clear();
+    bmsManager.bikes.clear();
+    for (const stationObj of config.stations) {
+        // Create Station instance
+        const station = new Station(
+            stationObj.id,
+            stationObj.capacity,
+            {
+                name: stationObj.name,
+                status: stationObj.status === 'out_of_service' ? 'out_of_service' : 'active',
+                latitude: stationObj.latitude,
+                longitude: stationObj.longitude,
+                address: stationObj.address,
+                reservationHoldTimeMinutes: stationObj.reservationHoldTimeMinutes
+            }
+        );
+        // Add bikes to station
+        for (const bikeObj of stationObj.bikes) {
+            const bike = new Bike(bikeObj.id, bikeObj.type);
+            bike.status = bikeObj.status;
+            station.dockedBikes.set(bike.id, bike);
+            bmsManager.bikes.set(bike.id, bike);
+        }
+        bmsManager.stations.set(station.id, station);
+    }
+    console.log(`Loaded ${bmsManager.stations.size} stations and ${bmsManager.bikes.size} bikes from config.`);
 }
 
 // Basic routes
 app.get('/', (req, res) => {
     res.json({ 
-        message: 'CodeBusters BMS API Server', 
+        message: 'CodeBusters BMS API Server with R-BMS-02 Implementation', 
         version: '1.0.0',
+        r_bms_02: 'Prevents undocking from empty stations and docking to full stations',
         endpoints: [
             'GET /api/bikes - Get all bikes',
             'GET /api/users - Get all users',
-            'GET /api/rentals - Get all rentals'
+            'GET /api/rentals - Get all rentals',
+            'GET /api/stations - Get all stations (R-BMS-02)',
+            'GET /api/stations/:id - Get specific station info',
+            'POST /api/stations - Create new station',
+            'POST /api/rent - Rent a bike (R-BMS-02 protected)',
+            'POST /api/return - Return a bike (R-BMS-02 protected)',
+            'GET /api/bms/overview - System overview with R-BMS-02 stats'
         ]
     });
 });
@@ -259,6 +369,178 @@ app.get('/api/temporary', (req, res) => {
         timestamp: new Date().toISOString(),
         status: 'authenticated'
     });
+});
+
+// ============= R-BMS-02 IMPLEMENTATION ENDPOINTS =============
+
+// Get all stations with R-BMS-02 compliance info
+app.get('/api/stations', (req, res) => {
+    try {
+        const stations = bmsManager.listAllStations();
+        res.json({
+            success: true,
+            r_bms_02_compliance: 'Active - prevents empty/full station operations',
+            stations: stations,
+            totalStations: stations.length
+        });
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Error retrieving stations',
+            error: error.message
+        });
+    }
+});
+
+// Get specific station information
+app.get('/api/stations/:id', (req, res) => {
+    try {
+        const stationInfo = bmsManager.getStationInfo(req.params.id);
+        if (stationInfo.success) {
+            res.json(stationInfo);
+        } else {
+            res.status(HTTP_STATUS.NOT_FOUND).json(stationInfo);
+        }
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Error retrieving station information',
+            error: error.message
+        });
+    }
+});
+
+// Create new station
+app.post('/api/stations', (req, res) => {
+    try {
+        const { stationId, capacity, location } = req.body;
+        
+        if (!stationId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                success: false,
+                message: 'Station ID is required'
+            });
+        }
+        
+        const result = bmsManager.addStation(stationId, capacity, location);
+        const statusCode = result.success ? HTTP_STATUS.OK : HTTP_STATUS.CONFLICT;
+        res.status(statusCode).json(result);
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Error creating station',
+            error: error.message
+        });
+    }
+});
+
+// R-BMS-02: Rent a bike (undock with empty station prevention)
+app.post('/api/rent', (req, res) => {
+    try {
+        const { userId, stationId, bikeId } = req.body;
+        
+        if (!userId || !stationId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                success: false,
+                message: 'User ID and Station ID are required'
+            });
+        }
+        
+        const result = bmsManager.rentBike(userId, stationId, bikeId);
+        
+        // R-BMS-02 specific status codes
+        let statusCode = HTTP_STATUS.OK;
+        if (!result.success) {
+            if (result.operation === BMS_OPERATIONS.UNDOCK_FAILED_EMPTY) {
+                statusCode = HTTP_STATUS.CONFLICT; // 409 for R-BMS-02 violation
+            } else {
+                statusCode = HTTP_STATUS.BAD_REQUEST;
+            }
+        }
+        
+        res.status(statusCode).json({
+            ...result,
+            r_bms_02_protected: result.operation === BMS_OPERATIONS.UNDOCK_FAILED_EMPTY ? 
+                'Blocked: Cannot undock from empty station' : 'Operation allowed'
+        });
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Error processing bike rental',
+            error: error.message
+        });
+    }
+});
+
+// R-BMS-02: Return a bike (dock with full station prevention)
+app.post('/api/return', (req, res) => {
+    try {
+        const { userId, bikeId, stationId } = req.body;
+        
+        if (!userId || !bikeId || !stationId) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                success: false,
+                message: 'User ID, Bike ID, and Station ID are required'
+            });
+        }
+        
+        const result = bmsManager.returnBike(userId, bikeId, stationId);
+        
+        // R-BMS-02 specific status codes
+        let statusCode = HTTP_STATUS.OK;
+        if (!result.success) {
+            if (result.operation === BMS_OPERATIONS.DOCK_FAILED_FULL) {
+                statusCode = HTTP_STATUS.CONFLICT; // 409 for R-BMS-02 violation
+            } else {
+                statusCode = HTTP_STATUS.BAD_REQUEST;
+            }
+        }
+        
+        res.status(statusCode).json({
+            ...result,
+            r_bms_02_protected: result.operation === BMS_OPERATIONS.DOCK_FAILED_FULL ? 
+                'Blocked: Cannot dock to full station' : 'Operation allowed'
+        });
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Error processing bike return',
+            error: error.message
+        });
+    }
+});
+
+// Get BMS system overview with R-BMS-02 statistics
+app.get('/api/bms/overview', (req, res) => {
+    try {
+        const overview = bmsManager.getSystemOverview();
+        res.json({
+            success: true,
+            message: 'BMS System Overview with R-BMS-02 Compliance',
+            ...overview
+        });
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Error retrieving system overview',
+            error: error.message
+        });
+    }
+});
+
+// Set station maintenance mode
+app.post('/api/stations/:id/maintenance', (req, res) => {
+    try {
+        const result = bmsManager.setStationMaintenance(req.params.id);
+        const statusCode = result.success ? HTTP_STATUS.OK : HTTP_STATUS.NOT_FOUND;
+        res.status(statusCode).json(result);
+    } catch (error) {
+        res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+            success: false,
+            message: 'Error setting station maintenance',
+            error: error.message
+        });
+    }
 });
 
 // Health check endpoint

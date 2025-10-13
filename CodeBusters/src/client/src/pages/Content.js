@@ -5,7 +5,7 @@ const Content = () => {
     return (
         <>
             <div>
-                <p>Page is just a placeholder, may need to be deleted or renamed to fit the rest of the app.</p>
+                <h1>Under Construction</h1>
             </div>
         </>
     );

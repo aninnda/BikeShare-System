@@ -3,6 +3,12 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import Content from './pages/Content';
 import Register from './pages/Register';
+import Plans from './pages/Plans';
+import Profile from './pages/Profile';
+import MapComponent from './components/MapComponent';
+import AvailableBikes from './components/AvailableBikes';
+import MyRentals from './components/MyRentals';
+import PricingDisplay from './components/PricingDisplay';
 import { Route, Routes, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import RoleBasedNavbar from './components/RoleBasedNavbar';
@@ -32,6 +38,7 @@ const AppContent = () => {
       <Routes>
         <Route path='/' element={<Home />} />
         <Route path='/home' element={<Home />} />
+        <Route path='/plans' element={<Plans />} />
         <Route path='/login' element={!user ? <Login /> : <Navigate to={user.role === 'rider' ? '/rider/dashboard' : '/operator/dashboard'} />} />
         <Route path='/register' element={!user ? <Register /> : <Navigate to={user.role === 'rider' ? '/rider/dashboard' : '/operator/dashboard'} />} />
         <Route path='/content' element={<Content />} />
@@ -39,29 +46,60 @@ const AppContent = () => {
         {/* Rider Routes */}
         <Route path='/rider/dashboard' element={
           <ProtectedRoute allowedRoles={['rider']}>
-            <div>Rider Dashboard</div>
+            <div style={{ padding: '20px' }}>
+              <h1 style={{ color: '#922338', textAlign: 'center', marginBottom: '20px' }}>
+                Rider Dashboard
+              </h1>
+              <PricingDisplay />
+            </div>
           </ProtectedRoute>
         } />
         <Route path='/rider/bikes' element={
           <ProtectedRoute allowedRoles={['rider']}>
-            <div>Available Bikes</div>
+            <AvailableBikes />
+          </ProtectedRoute>
+        } />
+        <Route path='/rider/plans' element={
+          <ProtectedRoute allowedRoles={['rider']}>
+            <Plans />
           </ProtectedRoute>
         } />
         <Route path='/rider/rentals' element={
           <ProtectedRoute allowedRoles={['rider']}>
-            <div>My Rentals</div>
+            <MyRentals />
           </ProtectedRoute>
         } />
         <Route path='/rider/profile' element={
           <ProtectedRoute allowedRoles={['rider']}>
-            <div>Rider Profile</div>
+            <Profile />
+          </ProtectedRoute>
+        } />
+        
+        {/* Profile Route - Available to both riders and operators */}
+        <Route path='/profile' element={
+          <ProtectedRoute allowedRoles={['rider', 'operator']}>
+            <Profile />
+          </ProtectedRoute>
+        } />
+        
+        {/* R-BMS-01 Map Routes - Available to both riders and operators */}
+        <Route path='/map' element={
+          <ProtectedRoute allowedRoles={['rider', 'operator']}>
+            <div style={{ padding: '20px' }}>
+              <MapComponent />
+            </div>
           </ProtectedRoute>
         } />
         
         {/* Operator Routes */}
         <Route path='/operator/dashboard' element={
           <ProtectedRoute allowedRoles={['operator']}>
-            <div>Operator Dashboard</div>
+            <div style={{ padding: '20px' }}>
+              <h1 style={{ color: '#922338', textAlign: 'center', marginBottom: '20px' }}>
+                Operator Dashboard
+              </h1>
+              <PricingDisplay />
+            </div>
           </ProtectedRoute>
         } />
         <Route path='/operator/bikes' element={
