@@ -1,0 +1,432 @@
+/* Profile Page Main Layout */
+.profile-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}
+
+.profile-sidebar {
+    width: 300px;
+    background-color: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.profile-main-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.profile-card {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 40px;
+    border-radius: 20px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 600px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.profile-title {
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profile-field-group {
+    margin-bottom: 20px;
+}
+
+.profile-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #333;
+    font-size: 0.95rem;
+}
+
+.profile-display-value {
+    padding: 15px 20px;
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e0e0e0;
+    font-size: 1rem;
+    color: #333;
+    min-height: 20px;
+}
+
+.profile-input {
+    width: 100%;
+    padding: 15px 20px;
+    border: 2px solid rgba(102, 126, 234, 0.2);
+    border-radius: 12px;
+    font-size: 1rem;
+    background-color: rgba(255, 255, 255, 0.9);
+    transition: all 0.3s ease;
+    outline: none;
+    font-family: inherit;
+    box-sizing: border-box;
+}
+
+.profile-input:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 20px rgba(102, 126, 234, 0.3);
+}
+
+.profile-button-group {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.profile-button {
+    flex: 1;
+    padding: 15px 25px;
+    border: none;
+    border-radius: 12px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.profile-button-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.profile-button-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+}
+
+.profile-button-secondary {
+    background: #e0e0e0;
+    color: #333;
+}
+
+.profile-button-secondary:hover {
+    background: #d0d0d0;
+}
+
+.profile-message {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+    font-weight: 500;
+}
+
+.profile-message.success {
+    background-color: rgba(40, 167, 69, 0.15);
+    border: 2px solid rgba(40, 167, 69, 0.3);
+    color: #28a745;
+}
+
+.profile-message.error {
+    background-color: rgba(220, 53, 69, 0.15);
+    border: 2px solid rgba(220, 53, 69, 0.3);
+    color: #dc3545;
+}
+
+/* Ride History Section */
+.ride-history-filters {
+    background-color: #f8f9fa;
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+    border: 2px solid #e9ecef;
+}
+
+.ride-history-filters-title {
+    margin: 0 0 15px 0;
+    font-size: 1.1rem;
+    color: #495057;
+}
+
+.ride-history-filters-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.ride-history-filter-input,
+.ride-history-filter-select {
+    width: 100%;
+    padding: 2px 6px;
+    border: 1px solid #ced4da;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    height: 26px;
+}
+
+.ride-history-filter-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #495057;
+}
+
+.ride-history-button-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.ride-history-button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.ride-history-button-search {
+    background-color: #007bff;
+    color: white;
+}
+
+.ride-history-button-search:hover {
+    background-color: #0056b3;
+}
+
+.ride-history-button-clear {
+    background-color: #6c757d;
+    color: white;
+}
+
+.ride-history-button-clear:hover {
+    background-color: #5a6268;
+}
+
+.ride-history-error {
+    color: #dc3545;
+}
+
+.ride-history-empty {
+    font-style: italic;
+    color: #6c757d;
+    text-align: center;
+    padding: 20px;
+}
+
+.ride-history-loading {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.2rem;
+    color: #667eea;
+}
+
+.ride-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.ride-history-item {
+    background: white;
+    border: 2px solid #e9ecef;
+    border-radius: 15px;
+    padding: 20px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+}
+
+.ride-history-item:hover {
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.15);
+    transform: translateY(-3px);
+}
+
+.ride-history-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.ride-history-item-info {
+    flex: 1;
+}
+
+.ride-history-item-badge {
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.ride-history-item-badge.standard {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.ride-history-item-badge.electric {
+    background-color: #ffc107;
+    color: #333;
+}
+
+.ride-history-item-details {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* Billing Section */
+.billing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.billing-title {
+    margin: 0;
+}
+
+.billing-refresh-button {
+    padding: 8px;
+    border-radius: 8px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.billing-error {
+    color: #dc3545;
+    margin-top: 12px;
+}
+
+.billing-total-section {
+    margin-top: 16px;
+    padding: 12px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+.billing-total-amount {
+    font-size: 1.4rem;
+    font-weight: 800;
+}
+
+.billing-total-amount.positive {
+    color: #d9534f;
+}
+
+.billing-total-amount.zero {
+    color: #28a745;
+}
+
+.billing-pay-button {
+    margin-top: 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.billing-pay-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.billing-items-list {
+    margin-top: 16px;
+}
+
+.billing-item {
+    padding: 12px;
+    margin-bottom: 10px;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #e9ecef;
+}
+
+.billing-item-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.billing-item-bike {
+    font-weight: 700;
+}
+
+.billing-item-bike-type {
+    font-weight: 400;
+    color: #6c757d;
+}
+
+.billing-item-time {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.billing-item-stations {
+    margin-top: 6px;
+    font-size: 0.9rem;
+}
+
+.billing-item-station-separator {
+    margin-left: 12px;
+}
+
+.billing-item-right {
+    text-align: right;
+}
+
+.billing-item-cost {
+    font-size: 1.1rem;
+    font-weight: 800;
+}
+
+.billing-item-pay-button {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+
+.billing-item-pay-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Notifications Section */
+.notifications-error {
+    color: #dc3545;
+    margin-bottom: 10px;
+}
+
+.notifications-empty {
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    padding: 20px;
+}

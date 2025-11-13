@@ -1,0 +1,242 @@
+/* Home Page Container */
+.home-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%);
+    background-image: url('https://cdn01.bcycle.com/libraries/images/default-source/default-library/ths00321-(2).jpg?sfvrsn=ab112cc5_0');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    position: relative;
+}
+
+/* Dark Overlay */
+.home-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1;
+}
+
+/* Hero Section */
+.home-hero {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    text-align: center;
+    color: white;
+}
+
+/* Main Title */
+.home-title {
+    font-size: 4rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+    max-width: 900px;
+    line-height: 1.2;
+}
+
+/* Subtitle */
+.home-subtitle {
+    font-size: 2.2rem;
+    font-weight: 300;
+    margin-bottom: 30px;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
+    max-width: 800px;
+    line-height: 1.4;
+}
+
+/* About Section */
+.home-about {
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 30px;
+    border-radius: 15px;
+    margin-bottom: 40px;
+    max-width: 900px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.home-about h3 {
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #4a90e2;
+}
+
+.home-about p {
+    font-size: 1.1rem;
+    margin-bottom: 20px;
+    line-height: 1.7;
+    text-align: left;
+}
+
+.home-about p:last-child {
+    margin-bottom: 0;
+}
+
+/* Button Container */
+.home-buttons {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* Primary Button */
+.home-button-primary {
+    padding: 15px 30px;
+    background-color: #28a745;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.home-button-primary:hover {
+    background-color: #218838;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+}
+
+/* Secondary Button */
+.home-button-secondary {
+    padding: 15px 30px;
+    background-color: transparent;
+    color: white;
+    border: 2px solid white;
+    border-radius: 25px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.home-button-secondary:hover {
+    background-color: white;
+    color: #357abd;
+    transform: translateY(-2px);
+}
+
+/* Features Grid */
+.home-features {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 30px;
+    margin-top: 60px;
+    max-width: 1200px;
+    width: 100%;
+}
+
+/* Feature Card */
+.feature-card {
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 25px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transform: translateY(0);
+    transition: all 0.4s ease;
+    cursor: pointer;
+}
+
+.feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+
+.feature-card.blue:hover {
+    border: 2px solid rgba(74, 144, 226, 0.7);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(74, 144, 226, 0.7);
+}
+
+.feature-card.green:hover {
+    border: 2px solid rgba(39, 174, 96, 0.7);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(39, 174, 96, 0.7);
+}
+
+.feature-card.red:hover {
+    border: 2px solid rgba(231, 76, 60, 0.7);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(231, 76, 60, 0.7);
+}
+
+.feature-card.orange:hover {
+    border: 2px solid rgba(243, 156, 18, 0.7);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(243, 156, 18, 0.7);
+}
+
+.feature-card.purple:hover {
+    border: 2px solid rgba(155, 89, 182, 0.7);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(155, 89, 182, 0.7);
+}
+
+.feature-card.teal:hover {
+    border: 2px solid rgba(26, 188, 156, 0.7);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(26, 188, 156, 0.7);
+}
+
+.feature-card h3 {
+    font-size: 1.4rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.feature-card h3.blue {
+    color: #4a90e2;
+}
+
+.feature-card h3.green {
+    color: #27ae60;
+}
+
+.feature-card h3.red {
+    color: #e74c3c;
+}
+
+.feature-card h3.orange {
+    color: #f39c12;
+}
+
+.feature-card h3.purple {
+    color: #9b59b6;
+}
+
+.feature-card h3.teal {
+    color: #1abc9c;
+}
+
+.feature-card p {
+    font-size: 1rem;
+    opacity: 0.9;
+    line-height: 1.5;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .home-title {
+        font-size: 2.5rem;
+    }
+
+    .home-subtitle {
+        font-size: 1.5rem;
+    }
+
+    .home-features {
+        grid-template-columns: 1fr;
+    }
+}

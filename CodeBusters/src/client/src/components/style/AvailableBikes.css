@@ -194,6 +194,48 @@
     font-size: 12px;
     color: #0b6cff;
 }
+
+.expired-status {
+    color: #ff4444;
+    font-weight: bold;
+    padding: 8px 12px;
+    background-color: #ffe6e6;
+    border: 1px solid #ff4444;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.bike-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.rent-button {
+    flex: 1;
+    padding: 8px 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.rent-button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.rent-button:disabled {
+    background: #95a5a6;
+    cursor: not-allowed;
+    transform: none;
+    opacity: 0.6;
+}
 }
 
 .capacity-info span {

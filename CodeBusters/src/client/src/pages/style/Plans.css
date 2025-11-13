@@ -1,0 +1,317 @@
+.plans-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 50%, #2c3e50 100%);
+    background-image: url('https://cdn01.bcycle.com/libraries/images/default-source/default-library/ths00321-(2).jpg?sfvrsn=ab112cc5_0');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+    position: relative;
+    color: white;
+    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.plans-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    z-index: 1;
+}
+
+.plans-container {
+    position: relative;
+    z-index: 2;
+    max-width: 1200px;
+    width: 100%;
+    text-align: center;
+}
+
+.plans-title {
+    font-size: 3.5rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    background: linear-gradient(45deg, #4a90e2, #f39c12, #e74c3c);
+    background-clip: text;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.plans-subtitle {
+    font-size: 1.3rem;
+    margin-bottom: 50px;
+    color: #ecf0f1;
+    max-width: 800px;
+    margin: 0 auto 50px auto;
+    line-height: 1.6;
+}
+
+.plans-pricing-section {
+    margin-bottom: 40px;
+    max-width: 1000px;
+    margin: 0 auto 40px auto;
+}
+
+.plans-pricing-title {
+    color: #fff;
+    margin-bottom: 20px;
+    font-size: 2rem;
+}
+
+.plans-pricing-cards {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.plans-pricing-card {
+    background-color: rgba(255, 255, 255, 0.95);
+    color: #111;
+    padding: 22px;
+    border-radius: 12px;
+    min-width: 260px;
+    text-align: center;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.plans-pricing-icon {
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+}
+
+.plans-pricing-rate {
+    font-size: 1.6rem;
+    font-weight: 700;
+}
+
+.plans-pricing-rate.standard {
+    color: #4a90e2;
+}
+
+.plans-pricing-rate.ebike {
+    color: #f39c12;
+}
+
+.plans-pricing-rate-unit {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.plans-pricing-description {
+    color: #333;
+    margin-top: 10px;
+}
+
+.plans-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 30px;
+    margin-bottom: 50px;
+}
+
+.plan-card {
+    background-color: rgba(0, 0, 0, 0.6);
+    padding: 30px;
+    border-radius: 15px;
+    text-align: center;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.4s ease;
+    cursor: pointer;
+    position: relative;
+    min-height: 400px;
+}
+
+.plan-card.popular {
+    border: 2px solid #f39c12;
+}
+
+.plan-card:hover {
+    transform: translateY(-10px);
+}
+
+.plan-card.blue:hover {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(74, 144, 226, 0.4);
+    border-color: rgba(74, 144, 226, 0.4);
+}
+
+.plan-card.orange:hover {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(243, 156, 18, 0.4);
+    border-color: rgba(243, 156, 18, 0.4);
+}
+
+.plan-card.red:hover {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4), 0 0 20px rgba(231, 76, 60, 0.4);
+    border-color: rgba(231, 76, 60, 0.4);
+}
+
+.plan-card-popular-badge {
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #f39c12;
+    color: white;
+    padding: 5px 20px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    font-weight: bold;
+}
+
+.plan-card-title {
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 15px;
+}
+
+.plan-card-title.blue {
+    color: #4a90e2;
+}
+
+.plan-card-title.orange {
+    color: #f39c12;
+}
+
+.plan-card-title.red {
+    color: #e74c3c;
+}
+
+.plan-card-price {
+    font-size: 3rem;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.plan-card-duration {
+    font-size: 1rem;
+    color: #aaa;
+    margin-bottom: 20px;
+}
+
+.plan-card-description {
+    font-size: 1rem;
+    opacity: 0.9;
+    line-height: 1.5;
+    margin-bottom: 20px;
+}
+
+.plan-card-features {
+    text-align: left;
+    margin-bottom: 30px;
+}
+
+.plan-card-feature {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+}
+
+.plan-card-feature-check {
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+.plan-card-feature-check.blue {
+    color: #4a90e2;
+}
+
+.plan-card-feature-check.orange {
+    color: #f39c12;
+}
+
+.plan-card-feature-check.red {
+    color: #e74c3c;
+}
+
+.plan-card-button {
+    width: 100%;
+    padding: 15px;
+    background-color: transparent;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.plan-card-button.blue {
+    color: #4a90e2;
+    border: 2px solid #4a90e2;
+}
+
+.plan-card-button.orange {
+    color: #f39c12;
+    border: 2px solid #f39c12;
+}
+
+.plan-card-button.red {
+    color: #e74c3c;
+    border: 2px solid #e74c3c;
+}
+
+.plan-card:hover .plan-card-button.blue {
+    background-color: #4a90e2;
+    color: #fff;
+}
+
+.plan-card:hover .plan-card-button.orange {
+    background-color: #f39c12;
+    color: #fff;
+}
+
+.plan-card:hover .plan-card-button.red {
+    background-color: #e74c3c;
+    color: #fff;
+}
+
+.plans-benefits {
+    background-color: rgba(0, 0, 0, 0.7);
+    padding: 30px;
+    border-radius: 15px;
+    max-width: 900px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    margin: 0 auto;
+}
+
+.plans-benefits-title {
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #4a90e2;
+}
+
+.plans-benefits-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+    text-align: left;
+}
+
+.plans-benefit-title {
+    margin-bottom: 10px;
+}
+
+.plans-benefit-title.eco {
+    color: #f39c12;
+}
+
+.plans-benefit-title.cost {
+    color: #e74c3c;
+}
+
+.plans-benefit-title.health {
+    color: #4a90e2;
+}
+
+.plans-benefit-text {
+    font-size: 0.95rem;
+    line-height: 1.5;
+}

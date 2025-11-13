@@ -1,0 +1,192 @@
+/* Custom marker styles */
+.custom-station-marker,
+.custom-bike-marker {
+  background: transparent;
+  border: none;
+}
+
+.custom-station-marker > div {
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  color: white;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+.custom-bike-marker > div {
+  border: 2px solid white;
+  border-radius: 50%;
+  width: 25px;
+  height: 25px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+  color: white;
+  font-weight: bold;
+  font-size: 10px;
+}
+
+/* Popup styles */
+.popup-container {
+  min-width: 250px;
+}
+
+.popup-container-bike {
+  min-width: 200px;
+}
+
+.popup-title {
+  margin: 0 0 10px 0;
+  color: #922338;
+}
+
+.popup-field {
+  margin-bottom: 8px;
+}
+
+.popup-status {
+  margin-left: 5px;
+  font-weight: bold;
+}
+
+.popup-bikes-list {
+  margin: 5px 0;
+  padding-left: 20px;
+}
+
+.popup-bikes-list li {
+  font-size: 12px;
+}
+
+.popup-reservation-expiry {
+  font-size: 10px;
+  color: #666;
+}
+
+/* Loading state */
+.map-loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+  background-color: #f5f5f5;
+}
+
+/* Error state */
+.map-error {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 400px;
+  background-color: #ffe6e6;
+  color: #cc0000;
+}
+
+/* Map header */
+.map-header {
+  margin: 0 0 20px 0;
+  color: #922338;
+  text-align: center;
+  font-size: 28px;
+  font-weight: bold;
+}
+
+/* Map container */
+.map-wrapper {
+  position: relative;
+}
+
+/* Map controls panel */
+.map-controls {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  background-color: white;
+  padding: 10px;
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.map-controls-button-group {
+  margin-bottom: 10px;
+}
+
+.map-refresh-button {
+  background-color: #922338;
+  color: white;
+  border: none;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  margin-right: 5px;
+}
+
+.map-refresh-button:hover {
+  background-color: #7a1d2e;
+}
+
+.map-checkbox-label {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+}
+
+.map-checkbox-label input {
+  margin-right: 5px;
+}
+
+/* Legend */
+.map-legend {
+  font-size: 12px;
+  margin-top: 10px;
+  color: #666;
+}
+
+.map-legend-section {
+  margin-top: 5px;
+}
+
+/* Map container */
+.leaflet-container {
+  height: 650px;
+  width: 100%;
+}
+
+/* Summary stats */
+.map-stats {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-around;
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 5px;
+}
+
+.map-stat-item {
+  text-align: center;
+}
+
+.map-stat-value {
+  font-weight: bold;
+  color: #922338;
+}
+
+.map-stat-value.available {
+  color: #44aa44;
+}
+
+.map-stat-value.out-of-service {
+  color: #ff4444;
+}
+
+.map-stat-label {
+  font-size: 12px;
+}

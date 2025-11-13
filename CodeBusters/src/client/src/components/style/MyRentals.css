@@ -358,3 +358,235 @@
         box-shadow: 0 10px 30px rgba(231,76,60,0.5), inset 0 2px 10px rgba(255,255,255,0.2);
     }
 }
+
+/* Elapsed Timer Styles */
+.elapsed-timer {
+    font-size: 3.5rem;
+    font-weight: 900;
+    text-align: center;
+    color: #ffffff;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+    font-family: monospace;
+    letter-spacing: 3px;
+    padding: 20px 30px;
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    border-radius: 20px;
+    border: 4px solid #ffffff;
+    box-shadow: 0 10px 30px rgba(231,76,60,0.5), inset 0 2px 10px rgba(255,255,255,0.2);
+    animation: pulse 2s infinite;
+    margin-bottom: 15px;
+    transform: scale(1.05);
+}
+
+/* Cost Estimator Styles */
+.cost-estimator {
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-align: center;
+    color: #007bff;
+    padding: 8px 12px;
+    background: rgba(0,123,255,0.1);
+    border-radius: 8px;
+    border: 2px solid rgba(0,123,255,0.3);
+    margin-top: 10px;
+}
+
+.cost-estimator-value {
+    color: #28a745;
+    font-weight: 800;
+}
+
+.cost-estimator-details {
+    font-size: 0.9rem;
+    opacity: 0.8;
+    margin-top: 4px;
+}
+
+/* Active Rental Timer Title */
+.active-rental-timer-title {
+    margin-bottom: 20px;
+    font-size: 1.8rem;
+    font-weight: 900;
+    text-align: center;
+    color: #ffffff;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+}
+
+/* Return Button Container */
+.return-button-container {
+    margin-top: 20px;
+    text-align: center;
+    position: relative;
+    z-index: 1000;
+}
+
+.return-bike-button {
+    padding: 15px 30px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    background-color: #e74c3c;
+    border: 3px solid white;
+    border-radius: 15px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(231,76,60,0.4);
+    transition: all 0.3s ease;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    position: relative;
+    z-index: 1001;
+}
+
+.return-bike-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 8px 25px rgba(231,76,60,0.6);
+}
+
+/* Return Stations Section */
+.return-stations-container {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+    color: white;
+    padding: 25px;
+    border-radius: 20px;
+    margin: 20px 0;
+    box-shadow: 0 10px 40px rgba(231,76,60,0.4);
+    border: 3px solid #ffffff;
+}
+
+.return-stations-header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.return-stations-title {
+    margin: 0 0 10px 0;
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.return-stations-subtitle {
+    margin: 0;
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.cancel-return-button {
+    background: rgba(255,255,255,0.2);
+    border: 2px solid white;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-size: 0.9rem;
+}
+
+.cancel-return-button:hover {
+    background: rgba(255,255,255,0.3);
+}
+
+/* Return Stations Grid */
+.return-stations-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.return-station-card {
+    background: rgba(255,255,255,0.95);
+    color: #333;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.return-station-name {
+    margin: 0 0 10px 0;
+    color: #e74c3c;
+    font-size: 1.2rem;
+}
+
+.return-station-address {
+    margin: 5px 0;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.return-station-docks {
+    margin: 10px 0;
+    font-size: 0.95rem;
+    font-weight: bold;
+}
+
+/* Dock Buttons */
+.dock-buttons-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 15px;
+}
+
+.dock-button {
+    background: #00b894;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: bold;
+    transition: all 0.3s ease;
+}
+
+.dock-button:hover {
+    background: #00a085;
+    transform: scale(1.05);
+}
+
+.dock-button-more {
+    background: #636e72;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.dock-button-more:hover {
+    background: #4a5557;
+}
+
+/* No Stations Available */
+.no-return-stations {
+    text-align: center;
+    padding: 20px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 10px;
+}
+
+.no-return-stations-title {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.no-return-stations-message {
+    margin: 5px 0 0 0;
+    font-size: 0.9rem;
+    opacity: 0.8;
+}
+
+/* Expired Message */
+.expired-message {
+    color: #ff4444;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px;
+    background-color: #ffe6e6;
+    border: 1px solid #ff4444;
+    border-radius: 4px;
+    font-size: 14px;
+}

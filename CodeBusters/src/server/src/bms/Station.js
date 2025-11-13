@@ -460,10 +460,23 @@ class Station {
     /**
      * Set station to maintenance mode
      */
-    setMaintenance() {
-        this.status = BMS_STATES.STATION.OUT_OF_SERVICE; // Maintenance = OOS
+    setMaintenance(isOutOfService = true) {
+        if (isOutOfService) {
+            this.status = 'out_of_service'; // R-BMS-01: out_of_service
+            console.log(`Station ${this.id} set to maintenance mode (out_of_service)`);
+        } else {
+            // Determine appropriate status based on bike count
+            const dockedCount = this.dockedBikes.size;
+            if (dockedCount === 0) {
+                this.status = 'empty'; // R-BMS-01: empty
+            } else if (dockedCount >= this.capacity) {
+                this.status = 'full'; // R-BMS-01: full
+            } else {
+                this.status = 'occupied'; // R-BMS-01: occupied
+            }
+            console.log(`Station ${this.id} returned to service (status: ${this.status})`);
+        }
         this.updatedAt = new Date();
-        console.log(`Station ${this.id} set to maintenance mode`);
     }
 }
 

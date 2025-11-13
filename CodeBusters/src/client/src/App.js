@@ -1,7 +1,8 @@
 import './App.css';
 import Home from './pages/Home';
 import Login from './pages/Login';
-import Content from './pages/Content';
+import ManageBikes from './pages/ManageBikes';
+import Analytics from './pages/Analytics';
 import Register from './pages/Register';
 import Plans from './pages/Plans';
 import Profile from './pages/Profile';
@@ -9,7 +10,8 @@ import MapComponent from './components/MapComponent';
 import AvailableBikes from './components/AvailableBikes';
 import MyRentals from './components/MyRentals';
 import PricingDisplay from './components/PricingDisplay';
-import { Route, Routes, Navigate } from 'react-router-dom';
+import Payment from './components/Payment';
+import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import RoleBasedNavbar from './components/RoleBasedNavbar';
 
@@ -41,7 +43,6 @@ const AppContent = () => {
         <Route path='/plans' element={<Plans />} />
         <Route path='/login' element={!user ? <Login /> : <Navigate to={user.role === 'rider' ? '/rider/dashboard' : '/operator/dashboard'} />} />
         <Route path='/register' element={!user ? <Register /> : <Navigate to={user.role === 'rider' ? '/rider/dashboard' : '/operator/dashboard'} />} />
-        <Route path='/content' element={<Content />} />
         
         {/* Rider Routes */}
         <Route path='/rider/dashboard' element={
@@ -59,10 +60,8 @@ const AppContent = () => {
             <AvailableBikes />
           </ProtectedRoute>
         } />
-        <Route path='/rider/plans' element={
-          <ProtectedRoute allowedRoles={['rider']}>
+        <Route path='/plans' element={
             <Plans />
-          </ProtectedRoute>
         } />
         <Route path='/rider/rentals' element={
           <ProtectedRoute allowedRoles={['rider']}>
@@ -92,24 +91,9 @@ const AppContent = () => {
         } />
         
         {/* Operator Routes */}
-        <Route path='/operator/dashboard' element={
-          <ProtectedRoute allowedRoles={['operator']}>
-            <div style={{ padding: '20px' }}>
-              <h1 style={{ color: '#922338', textAlign: 'center', marginBottom: '20px' }}>
-                Operator Dashboard
-              </h1>
-              <PricingDisplay />
-            </div>
-          </ProtectedRoute>
-        } />
         <Route path='/operator/bikes' element={
           <ProtectedRoute allowedRoles={['operator']}>
-            <div>Manage Bikes</div>
-          </ProtectedRoute>
-        } />
-        <Route path='/operator/users' element={
-          <ProtectedRoute allowedRoles={['operator']}>
-            <div>Manage Users</div>
+            <ManageBikes/>
           </ProtectedRoute>
         } />
         <Route path='/operator/rentals' element={
@@ -119,12 +103,26 @@ const AppContent = () => {
         } />
         <Route path='/operator/analytics' element={
           <ProtectedRoute allowedRoles={['operator']}>
-            <div>Analytics</div>
+            <Analytics />
+          </ProtectedRoute>
+        } />
+        <Route path='/payment' element={
+          <ProtectedRoute allowedRoles={['rider']}>
+            <PaymentWrapper />
           </ProtectedRoute>
         } />
       </Routes>
     </div>
   );
+};
+
+// Wrapper to bridge router state to Payment component props
+const PaymentWrapper = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const selected = location.state && location.state.selectedPlan ? location.state.selectedPlan : null;
+  const onBack = () => navigate(-1);
+  return <Payment selectedPlan={selected} onBack={onBack} />;
 };
 
 function App() {

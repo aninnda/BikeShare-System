@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './AvailableBikes.css';
+import './style/AvailableBikes.css';
 
 const AvailableBikes = () => {
     const [stations, setStations] = useState([]);
@@ -439,11 +439,11 @@ const AvailableBikes = () => {
                 const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
 
                 alert(
-                    `✅ Bike ${activeRentalLocal.bikeId} successfully returned to ${stationName}!\n\n` +
-                    `📊 Rental Summary:\n` +
-                    `⏱️ Duration: ${hours}h ${minutes}m\n` +
-                    `📍 Returned to: ${stationName}\n` +
-                    `💰 Final cost will be calculated based on your rental duration.`
+                    `Bike ${activeRentalLocal.bikeId} successfully returned to ${stationName}!\n\n` +
+                    `Rental Summary:\n` +
+                    `Duration: ${hours}h ${minutes}m\n` +
+                    `Returned to: ${stationName}\n` +
+                    `Final cost will be calculated based on your rental duration.`
                 );
                 
                 // Clear local active rental
@@ -617,16 +617,7 @@ const AvailableBikes = () => {
                                         Cancel Reservation
                                     </button>
                                 ) : (
-                                    <div className="expired-status" style={{ 
-                                        color: '#ff4444', 
-                                        fontWeight: 'bold',
-                                        padding: '8px 12px',
-                                        backgroundColor: '#ffe6e6',
-                                        border: '1px solid #ff4444',
-                                        borderRadius: '4px',
-                                        textAlign: 'center',
-                                        fontSize: '14px'
-                                    }}>
+                                    <div className="expired-status">
                                         RESERVATION EXPIRED - Bike Available
                                     </div>
                                 )
@@ -664,7 +655,7 @@ const AvailableBikes = () => {
                 </div>
                 {activeRentalLocal && station.freeDockIds && station.freeDockIds.length > 0 && (
                     <div className="free-docks">
-                        <strong>🏁 Return {activeRentalLocal.bikeId} here:</strong>
+                        <strong>Return {activeRentalLocal.bikeId} here:</strong>
                         <div className="return-instruction">
                             Click any dock below to return your bike to {station.name}
                         </div>
@@ -676,7 +667,7 @@ const AvailableBikes = () => {
                                     onClick={() => returnBike(station.id, d, station.name)}
                                     title={`Return bike ${activeRentalLocal.bikeId} to dock ${d} at ${station.name}`}
                                 >
-                                    📍 {d}
+                                    {d}
                                 </button>
                             ))}
                             {station.freeDockIds.length > 8 && (
@@ -711,7 +702,6 @@ const AvailableBikes = () => {
                     bikes={station.reservedBikes.bikes} 
                     title="Reserved Bikes" 
                     emptyMessage="No bikes currently reserved"
-                    icon="📋"
                     station={station}
                     showReserveButton={false}
                 />
@@ -722,7 +712,6 @@ const AvailableBikes = () => {
                     bikes={station.maintenanceBikes.bikes} 
                     title="Maintenance Bikes" 
                     emptyMessage="No bikes in maintenance"
-                    icon="🔧"
                     station={station}
                     showReserveButton={false}
                 />
@@ -736,7 +725,7 @@ const AvailableBikes = () => {
     return (
         <div className="available-bikes-container">
             <div className="header">
-                <h1>🚲 Available Bikes</h1>
+                <h1>Available Bikes</h1>
                 <p>Find and rent bikes from stations across Montreal</p>
             </div>
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './MyRentals.css';
+import './style/MyRentals.css';
 
 const MyRentals = () => {
     // Small component to show elapsed time since startTime
@@ -21,23 +21,7 @@ const MyRentals = () => {
         const pad = (n) => String(n).padStart(2, '0');
 
         return (
-            <div style={{ 
-                fontSize: '3.5rem', 
-                fontWeight: '900',
-                textAlign: 'center',
-                color: '#ffffff',
-                textShadow: '3px 3px 6px rgba(0,0,0,0.8)',
-                fontFamily: 'monospace',
-                letterSpacing: '3px',
-                padding: '20px 30px',
-                background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
-                borderRadius: '20px',
-                border: '4px solid #ffffff',
-                boxShadow: '0 10px 30px rgba(231,76,60,0.5), inset 0 2px 10px rgba(255,255,255,0.2)',
-                animation: 'pulse 2s infinite',
-                marginBottom: '15px',
-                transform: 'scale(1.05)'
-            }}>
+            <div className="elapsed-timer">
                 ⏱️ {pad(hours)}:{pad(minutes)}:{pad(seconds)}
             </div>
         );
@@ -62,19 +46,9 @@ const MyRentals = () => {
         const estimatedCost = durationMinutes * ratePerMinute;
 
         return (
-            <div style={{ 
-                fontSize: '1.4rem', 
-                fontWeight: '600',
-                textAlign: 'center',
-                color: '#007bff',
-                padding: '8px 12px',
-                background: 'rgba(0,123,255,0.1)',
-                borderRadius: '8px',
-                border: '2px solid rgba(0,123,255,0.3)',
-                marginTop: '10px'
-            }}>
-                💰 Estimated Cost: <span style={{color: '#28a745', fontWeight: '800'}}>${estimatedCost.toFixed(2)}</span>
-                <div style={{fontSize: '0.9rem', opacity: 0.8, marginTop: '4px'}}>
+            <div className="cost-estimator">
+                Estimated Cost: <span className="cost-estimator-value">${estimatedCost.toFixed(2)}</span>
+                <div className="cost-estimator-details">
                     {durationMinutes} min × ${ratePerMinute}/min ({isEbike ? 'E-Bike' : 'Standard'})
                 </div>
             </div>
@@ -97,27 +71,6 @@ const MyRentals = () => {
 
         return () => clearInterval(timer);
     }, []);
-
-    // Function to load active rental from localStorage
-    const tryLoadActive = () => {
-        try {
-            const activeRentalData = localStorage.getItem('activeRental');
-            console.log('MyRentals: Raw activeRental from localStorage:', activeRentalData);
-            
-            if (!activeRentalData || activeRentalData === 'null') {
-                console.log('MyRentals: No active rental found');
-                setActiveRental(null);
-                return;
-            }
-
-            const ar = JSON.parse(activeRentalData);
-            console.log('MyRentals: Parsed active rental:', ar);
-            setActiveRental(ar);
-        } catch (e) {
-            console.log('MyRentals: Error loading active rental:', e);
-            setActiveRental(null);
-        }
-    };
 
     // Function to fetch active rental from server and validate against local data
     const fetchServerActiveRental = async () => {
@@ -433,11 +386,11 @@ const MyRentals = () => {
                 const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
 
                 alert(
-                    `✅ Bike ${activeRental.bikeId} successfully returned to ${stationName}!\n\n` +
-                    `📊 Rental Summary:\n` +
-                    `⏱️ Duration: ${hours}h ${minutes}m\n` +
-                    `📍 Returned to: ${stationName} (Dock ${dockId})\n` +
-                    `💰 Final cost will be calculated based on your rental duration.`
+                    `Bike ${activeRental.bikeId} successfully returned to ${stationName}!\n\n` +
+                    `Rental Summary:\n` +
+                    `Duration: ${hours}h ${minutes}m\n` +
+                    `Returned to: ${stationName} (Dock ${dockId})\n` +
+                    `Final cost will be calculated based on your rental duration.`
                 );
                 
                 // Clear local active rental
@@ -463,12 +416,12 @@ const MyRentals = () => {
                 
                 console.log('Bike returned successfully, activeRental cleared');
             } else {
-                alert(`❌ Failed to return bike: ${data.message}\n\nPlease try again or contact support.`);
+                alert(`Failed to return bike: ${data.message}\n\nPlease try again or contact support.`);
                 console.error('Return failed:', data);
             }
         } catch (err) {
             console.error('Return error:', err);
-            alert('❌ Network error during return. Please check your connection and try again.');
+            alert('Network error during return. Please check your connection and try again.');
         }
     };
 
@@ -481,7 +434,7 @@ const MyRentals = () => {
     return (
         <div className="my-rentals-container">
             <div className="header">
-                <h1>📋 My Rentals & Reservations</h1>
+                <h1>My Rentals & Reservations</h1>
                 <p>Manage your active bike reservations and rentals</p>
             </div>
 
@@ -493,67 +446,30 @@ const MyRentals = () => {
                     {/* Active rental section - show this first if user has an active rental */}
                     {activeRental && (
                         <div className="active-rental-card">
-                            <h2>🚴‍♂️ CURRENTLY RENTING</h2>
+                            <h2>CURRENTLY RENTING</h2>
                             <div className="active-rental-info">
                                 <div className="active-rental-details">
-                                    <h3>🚲 Bike: {activeRental.bikeId}</h3>
-                                    <p>📍 Rented from: {activeRental.stationName || 'Unknown Station'}</p>
-                                    <p>🏷️ Station ID: {activeRental.stationId}</p>
-                                    <p>👤 Rider: {activeRental.username}</p>
-                                    <p>🕐 Started: {new Date(activeRental.startTime).toLocaleTimeString()}</p>
+                                    <h3>Bike: {activeRental.bikeId}</h3>
+                                    <p>Rented from: {activeRental.stationName || 'Unknown Station'}</p>
+                                    <p>Station ID: {activeRental.stationId}</p>
+                                    <p>Rider: {activeRental.username}</p>
+                                    <p>Started: {new Date(activeRental.startTime).toLocaleTimeString()}</p>
                                 </div>
                                 <div className="active-rental-timer">
-                                    <div style={{ 
-                                        marginBottom: '20px', 
-                                        fontSize: '1.8rem', 
-                                        fontWeight: '900',
-                                        textAlign: 'center',
-                                        color: '#ffffff',
-                                        textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-                                        letterSpacing: '2px',
-                                        textTransform: 'uppercase'
-                                    }}>
-                                        ⏰ ACTIVE RENTAL TIMER
+                                    <div className="active-rental-timer-title">
+                                        ACTIVE RENTAL TIMER
                                     </div>
                                     <ElapsedTimer startTime={activeRental.startTime} />
                                     <CostEstimator 
                                         startTime={activeRental.startTime} 
                                         bikeType={activeRental.bikeType || 'standard'} 
                                     />
-                                    <div style={{ 
-                                        marginTop: '20px', 
-                                        textAlign: 'center',
-                                        position: 'relative',
-                                        zIndex: 1000
-                                    }}>
+                                    <div className="return-button-container">
                                         <button 
-                                            className="rent-now-btn" 
+                                            className="return-bike-button" 
                                             onClick={showReturnOptions}
-                                            style={{
-                                                padding: '15px 30px',
-                                                fontSize: '1.1rem',
-                                                fontWeight: 'bold',
-                                                backgroundColor: '#e74c3c',
-                                                border: '3px solid white',
-                                                borderRadius: '15px',
-                                                color: 'white',
-                                                cursor: 'pointer',
-                                                boxShadow: '0 6px 20px rgba(231,76,60,0.4)',
-                                                transition: 'all 0.3s ease',
-                                                textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
-                                                position: 'relative',
-                                                zIndex: 1001
-                                            }}
-                                            onMouseOver={(e) => {
-                                                e.target.style.transform = 'scale(1.05)';
-                                                e.target.style.boxShadow = '0 8px 25px rgba(231,76,60,0.6)';
-                                            }}
-                                            onMouseOut={(e) => {
-                                                e.target.style.transform = 'scale(1)';
-                                                e.target.style.boxShadow = '0 6px 20px rgba(231,76,60,0.4)';
-                                            }}
                                         >
-                                            🏁 Return Bike
+                                            Return Bike
                                         </button>
                                     </div>
                                 </div>
@@ -563,108 +479,48 @@ const MyRentals = () => {
 
                     {/* Return Stations Section */}
                     {showReturnStations && (
-                        <div style={{
-                            background: 'linear-gradient(135deg, #e74c3c, #c0392b)',
-                            color: 'white',
-                            padding: '25px',
-                            borderRadius: '20px',
-                            margin: '20px 0',
-                            boxShadow: '0 10px 40px rgba(231,76,60,0.4)',
-                            border: '3px solid #ffffff'
-                        }}>
-                            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                                <h2 style={{ margin: '0 0 10px 0', fontSize: '1.8rem', fontWeight: 'bold' }}>
-                                    🏁 RETURN BIKE: {activeRental?.bikeId}
+                        <div className="return-stations-container">
+                            <div className="return-stations-header">
+                                <h2 className="return-stations-title">
+                                    RETURN BIKE: {activeRental?.bikeId}
                                 </h2>
-                                <p style={{ margin: '0', fontSize: '1.1rem', opacity: 0.9 }}>
+                                <p className="return-stations-subtitle">
                                     Choose a station to return your bike
                                 </p>
                                 <button 
                                     onClick={cancelReturn}
-                                    style={{
-                                        background: 'rgba(255,255,255,0.2)',
-                                        border: '2px solid white',
-                                        color: 'white',
-                                        padding: '8px 16px',
-                                        borderRadius: '8px',
-                                        cursor: 'pointer',
-                                        marginTop: '10px',
-                                        fontSize: '0.9rem'
-                                    }}
+                                    className="cancel-return-button"
                                 >
-                                    ❌ Cancel Return
+                                    Cancel Return
                                 </button>
                             </div>
                             
-                            <div style={{
-                                display: 'grid',
-                                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                                gap: '15px',
-                                maxHeight: '400px',
-                                overflowY: 'auto'
-                            }}>
+                            <div className="return-stations-grid">
                                 {returnStations.map(station => (
-                                    <div key={station.id} style={{
-                                        background: 'rgba(255,255,255,0.95)',
-                                        color: '#333',
-                                        padding: '15px',
-                                        borderRadius: '15px',
-                                        boxShadow: '0 4px 15px rgba(0,0,0,0.1)'
-                                    }}>
-                                        <h3 style={{ margin: '0 0 10px 0', color: '#e74c3c', fontSize: '1.2rem' }}>
-                                            📍 {station.name}
+                                    <div key={station.id} className="return-station-card">
+                                        <h3 className="return-station-name">
+                                            {station.name}
                                         </h3>
-                                        <p style={{ margin: '5px 0', fontSize: '0.9rem', color: '#666' }}>
+                                        <p className="return-station-address">
                                             {station.address}
                                         </p>
-                                        <p style={{ margin: '10px 0', fontSize: '0.95rem', fontWeight: 'bold' }}>
-                                            🚲 {station.freeDocks} free docks available
+                                        <p className="return-station-docks">
+                                            {station.freeDocks} free docks available
                                         </p>
                                         
-                                        <div style={{ 
-                                            display: 'flex', 
-                                            flexWrap: 'wrap', 
-                                            gap: '8px', 
-                                            marginTop: '15px' 
-                                        }}>
+                                        <div className="dock-buttons-container">
                                             {station.freeDockIds.slice(0, 6).map(dockId => (
                                                 <button
                                                     key={dockId}
                                                     onClick={() => returnBikeToStation(station.id, dockId, station.name)}
-                                                    style={{
-                                                        background: '#00b894',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        padding: '8px 12px',
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '0.9rem',
-                                                        fontWeight: 'bold',
-                                                        transition: 'all 0.3s ease'
-                                                    }}
-                                                    onMouseOver={(e) => {
-                                                        e.target.style.background = '#00a085';
-                                                        e.target.style.transform = 'scale(1.05)';
-                                                    }}
-                                                    onMouseOut={(e) => {
-                                                        e.target.style.background = '#00b894';
-                                                        e.target.style.transform = 'scale(1)';
-                                                    }}
+                                                    className="dock-button"
                                                 >
-                                                    🔒 Dock {dockId}
+                                                    Dock {dockId}
                                                 </button>
                                             ))}
                                             {station.freeDockIds.length > 6 && (
                                                 <button
-                                                    style={{
-                                                        background: '#636e72',
-                                                        color: 'white',
-                                                        border: 'none',
-                                                        padding: '8px 12px',
-                                                        borderRadius: '8px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '0.8rem'
-                                                    }}
+                                                    className="dock-button-more"
                                                     onClick={() => alert(`All available docks at ${station.name}:\n\n${station.freeDockIds.join(', ')}`)}
                                                 >
                                                     +{station.freeDockIds.length - 6} more
@@ -676,16 +532,11 @@ const MyRentals = () => {
                             </div>
                             
                             {returnStations.length === 0 && !loading && (
-                                <div style={{ 
-                                    textAlign: 'center', 
-                                    padding: '20px',
-                                    background: 'rgba(255,255,255,0.1)',
-                                    borderRadius: '10px'
-                                }}>
-                                    <p style={{ margin: 0, fontSize: '1.1rem' }}>
-                                        ⚠️ No stations with available docks found nearby.
+                                <div className="no-return-stations">
+                                    <p className="no-return-stations-title">
+                                        No stations with available docks found nearby.
                                     </p>
-                                    <p style={{ margin: '5px 0 0 0', fontSize: '0.9rem', opacity: 0.8 }}>
+                                    <p className="no-return-stations-message">
                                         Please try again in a few minutes or contact support.
                                     </p>
                                 </div>
@@ -716,7 +567,7 @@ const MyRentals = () => {
                                             
                                             <div className="reservation-details">
                                                 <div className="station-info">
-                                                    <h4>📍 {reservation.stationName}</h4>
+                                                    <h4>{reservation.stationName}</h4>
                                                     <p className="address">{reservation.stationAddress}</p>
                                                 </div>
                                                 
@@ -732,7 +583,7 @@ const MyRentals = () => {
                                                         style={{ color: timeRemaining.color }}
                                                     >
                                                         <strong>
-                                                            {timeRemaining.expired ? '⚠️ EXPIRED' : `⏱️ ${timeRemaining.text}`}
+                                                            {timeRemaining.expired ? 'EXPIRED' : `${timeRemaining.text}`}
                                                         </strong>
                                                     </div>
                                                 </div>
@@ -756,16 +607,7 @@ const MyRentals = () => {
                                                         </button>
                                                     </>
                                                 ) : (
-                                                    <div className="expired-message" style={{
-                                                        color: '#ff4444',
-                                                        fontWeight: 'bold',
-                                                        textAlign: 'center',
-                                                        padding: '10px',
-                                                        backgroundColor: '#ffe6e6',
-                                                        border: '1px solid #ff4444',
-                                                        borderRadius: '4px',
-                                                        fontSize: '14px'
-                                                    }}>
+                                                    <div className="expired-message">
                                                         Reservation Expired - Bike is now available for others
                                                     </div>
                                                 )}

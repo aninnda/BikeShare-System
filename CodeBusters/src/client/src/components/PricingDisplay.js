@@ -1,5 +1,5 @@
 import React from 'react';
-import './PricingDisplay.css';
+import './style/PricingDisplay.css';
 
 const PricingDisplay = () => {
   return (
@@ -24,7 +24,6 @@ const PricingDisplay = () => {
         </div>
 
         <div className="pricing-card ebike">
-          <div className="bike-icon">⚡</div>
           <h3 className="bike-type">E-Bike</h3>
           <div className="price">
             <span className="price-amount">25¢</span>
@@ -32,10 +31,10 @@ const PricingDisplay = () => {
           </div>
           <div className="features">
             <ul>
-              <li>⚡ Electric assistance</li>
-              <li>⚡ Longer range capability</li>
-              <li>⚡ Easy uphill climbing</li>
-              <li>⚡ Premium experience</li>
+              <li>Electric assistance</li>
+              <li>Longer range capability</li>
+              <li>Easy uphill climbing</li>
+              <li>Premium experience</li>
             </ul>
           </div>
         </div>

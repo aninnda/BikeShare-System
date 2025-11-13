@@ -419,7 +419,7 @@ class BMSManager {
     /**
      * Emergency: Set station maintenance mode
      */
-    setStationMaintenance(stationId) {
+    setStationMaintenance(stationId, isOutOfService = true) {
         if (!this.stations.has(stationId)) {
             return {
                 success: false,
@@ -427,10 +427,13 @@ class BMSManager {
             };
         }
 
-        this.stations.get(stationId).setMaintenance();
+        const station = this.stations.get(stationId);
+        station.setMaintenance(isOutOfService);
+        
         return {
             success: true,
-            message: `Station ${stationId} set to maintenance mode`
+            message: `Station ${stationId} ${isOutOfService ? 'taken out of service' : 'returned to service'}`,
+            station: station.getStationInfo()
         };
     }
 }

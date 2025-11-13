@@ -64,7 +64,7 @@ The server will start on `http://localhost:5000`
 
 Create a `.env` file with:
 ```
-PORT=5000
+PORT=5001
 DB_PATH=./database.sqlite
 CORS_ORIGIN=http://localhost:3000
 ```

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './style/MapComponent.css';
 
 // Cache cleared - no dark mode
 
@@ -18,40 +19,14 @@ const createCustomIcon = (color, isStation = true) => {
     if (isStation) {
         return L.divIcon({
             className: 'custom-station-marker',
-            html: `<div style="
-                background-color: ${color};
-                border: 2px solid white;
-                border-radius: 50%;
-                width: 30px;
-                height: 30px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                color: white;
-                font-weight: bold;
-                font-size: 12px;
-            ">🚉</div>`,
+            html: `<div style="background-color: ${color} !important;">🚉</div>`,
             iconSize: [30, 30],
             iconAnchor: [15, 15],
         });
     } else {
         return L.divIcon({
             className: 'custom-bike-marker',
-            html: `<div style="
-                background-color: ${color};
-                border: 2px solid white;
-                border-radius: 50%;
-                width: 25px;
-                height: 25px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-                color: white;
-                font-weight: bold;
-                font-size: 10px;
-            ">🚲</div>`,
+            html: `<div style="background-color: ${color} !important;">🚲</div>`,
             iconSize: [25, 25],
             iconAnchor: [12, 12],
         });
@@ -61,12 +36,16 @@ const createCustomIcon = (color, isStation = true) => {
 // Station status colors for R-BMS-01 requirements
 const getStationColor = (station) => {
     // R-BMS-01: Status (empty | occupied | full | out_of_service)
+    console.log('Station:', station.id, 'Status:', station.status, 'Bikes:', station.numberOfBikesDocked, 'Capacity:', station.capacity);
+    
     switch (station.status) {
         case 'out_of_service': return '#ff4444'; // Red
         case 'empty': return '#ffaa00'; // Orange
         case 'full': return '#4444ff'; // Blue
         case 'occupied': return '#44aa44'; // Green
-        default: return '#888888'; // Gray for unknown status
+        default: 
+            console.warn('Unknown station status:', station.status);
+            return '#888888'; // Gray for unknown status
     }
 };
 
@@ -88,59 +67,55 @@ const StationMarker = ({ station }) => {
     return (
         <Marker position={[station.latitude, station.longitude]} icon={icon}>
             <Popup>
-                <div style={{ minWidth: '250px' }}>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#922338' }}>
+                <div className="popup-container">
+                    <h3 className="popup-title">
                         {station.name}
                     </h3>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Status:</strong> 
-                        <span style={{ 
-                            color: color, 
-                            marginLeft: '5px',
-                            fontWeight: 'bold'
-                        }}>
+                        <span className="popup-status" style={{ color: color }}>
                             {station.status}
                         </span>
                     </div>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Address:</strong><br />
                         {station.address}
                     </div>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Capacity:</strong> {station.capacity} docks
                     </div>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Bikes Available:</strong> {station.availableBikesCount || station.bikesAvailable || 0}
                     </div>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Bikes Docked:</strong> {station.numberOfBikesDocked || 0} (includes {station.reservedBikesCount || 0} reserved)
                     </div>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Free Docks:</strong> {station.freeDocks || 0}
                     </div>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Coordinates:</strong> {station.latitude}, {station.longitude}
                     </div>
                     
                     {station.bikes && station.bikes.length > 0 && (
-                        <div style={{ marginBottom: '8px' }}>
+                        <div className="popup-field">
                             <strong>Docked Bikes:</strong>
-                            <ul style={{ margin: '5px 0', paddingLeft: '20px' }}>
+                            <ul className="popup-bikes-list">
                                 {station.bikes.map(bike => (
-                                    <li key={bike.id} style={{ fontSize: '12px' }}>
+                                    <li key={bike.id}>
                                         {bike.id} ({bike.type}) - 
                                         <span style={{ color: getBikeColor(bike) }}>
                                             {bike.status}
                                         </span>
                                         {bike.reservationExpiry && (
-                                            <div style={{ fontSize: '10px', color: '#666' }}>
+                                            <div className="popup-reservation-expiry">
                                                 Reserved until: {new Date(bike.reservationExpiry).toLocaleTimeString()}
                                             </div>
                                         )}
@@ -150,7 +125,7 @@ const StationMarker = ({ station }) => {
                         </div>
                     )}
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Reservation Hold Time:</strong> {station.reservationHoldTimeMinutes || 15} minutes
                     </div>
                 </div>
@@ -170,35 +145,31 @@ const BikeMarker = ({ bike }) => {
     return (
         <Marker position={[bike.station.latitude, bike.station.longitude]} icon={icon}>
             <Popup>
-                <div style={{ minWidth: '200px' }}>
-                    <h3 style={{ margin: '0 0 10px 0', color: '#922338' }}>
+                <div className="popup-container-bike">
+                    <h3 className="popup-title">
                         Bike {bike.id}
                     </h3>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Type:</strong> {bike.type}
                     </div>
                     
-                    <div style={{ marginBottom: '8px' }}>
+                    <div className="popup-field">
                         <strong>Status:</strong> 
-                        <span style={{ 
-                            color: color, 
-                            marginLeft: '5px',
-                            fontWeight: 'bold'
-                        }}>
+                        <span className="popup-status" style={{ color: color }}>
                             {bike.status}
                         </span>
                     </div>
                     
                     {bike.station && (
-                        <div style={{ marginBottom: '8px' }}>
+                        <div className="popup-field">
                             <strong>Station:</strong><br />
                             {bike.station.stationName}
                         </div>
                     )}
                     
                     {bike.reservationExpiry && (
-                        <div style={{ marginBottom: '8px' }}>
+                        <div className="popup-field">
                             <strong>Reserved Until:</strong><br />
                             {new Date(bike.reservationExpiry).toLocaleString()}
                         </div>
@@ -251,13 +222,7 @@ const MapComponent = () => {
 
     if (loading) {
         return (
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                height: '400px',
-                backgroundColor: '#f5f5f5'
-            }}>
+            <div className="map-loading">
                 <div>Loading map data...</div>
             </div>
         );
@@ -265,14 +230,7 @@ const MapComponent = () => {
 
     if (error) {
         return (
-            <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                height: '400px',
-                backgroundColor: '#ffe6e6',
-                color: '#cc0000'
-            }}>
+            <div className="map-error">
                 <div>Error loading map: {error}</div>
             </div>
         );
@@ -280,61 +238,37 @@ const MapComponent = () => {
 
     return (
         <div>
-            <h2 style={{ 
-                margin: '0 0 20px 0', 
-                color: '#922338', 
-                textAlign: 'center',
-                fontSize: '28px',
-                fontWeight: 'bold'
-            }}>
+            <h2 className="map-header">
                 Find your docking station!
             </h2>
-            <div style={{ position: 'relative' }}>
+            <div className="map-wrapper">
                 {/* Map Controls */}
-            <div style={{ 
-                position: 'absolute', 
-                top: '10px', 
-                right: '10px', 
-                zIndex: 1000,
-                backgroundColor: 'white',
-                padding: '10px',
-                borderRadius: '5px',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.3)'
-            }}>
-                <div style={{ marginBottom: '10px' }}>
+            <div className="map-controls">
+                <div className="map-controls-button-group">
                     <button 
                         onClick={fetchMapData}
-                        style={{ 
-                            backgroundColor: '#922338',
-                            color: 'white',
-                            border: 'none',
-                            padding: '5px 10px',
-                            borderRadius: '3px',
-                            cursor: 'pointer',
-                            marginRight: '5px'
-                        }}
+                        className="map-refresh-button"
                     >
                         Refresh
                     </button>
                 </div>
                 
-                <label style={{ display: 'flex', alignItems: 'center', fontSize: '14px' }}>
+                <label className="map-checkbox-label">
                     <input 
                         type="checkbox"
                         checked={showBikes}
                         onChange={(e) => setShowBikes(e.target.checked)}
-                        style={{ marginRight: '5px' }}
                     />
                     Show Individual Bikes
                 </label>
                 
-                <div style={{ fontSize: '12px', marginTop: '10px', color: '#666' }}>
+                <div className="map-legend">
                     <div><strong>Station Status:</strong></div>
                     <div><span style={{ color: '#44aa44' }}>●</span> Occupied</div>
                     <div><span style={{ color: '#ffaa00' }}>●</span> Empty</div>
                     <div><span style={{ color: '#4444ff' }}>●</span> Full</div>
                     <div><span style={{ color: '#ff4444' }}>●</span> Out of Service</div>
-                    <div style={{ marginTop: '5px' }}><strong>Bike Status:</strong></div>
+                    <div className="map-legend-section"><strong>Bike Status:</strong></div>
                     <div><span style={{ color: '#44aa44' }}>●</span> Available</div>
                     <div><span style={{ color: '#ffaa00' }}>●</span> Reserved</div>
                     <div><span style={{ color: '#4444ff' }}>●</span> On Trip</div>
@@ -346,7 +280,7 @@ const MapComponent = () => {
             <MapContainer 
                 center={mapCenter} 
                 zoom={12} 
-                style={{ height: '650px', width: '100%' }}
+                className="leaflet-container"
             >
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -371,37 +305,30 @@ const MapComponent = () => {
             </MapContainer>
             
             {/* Summary Stats */}
-            <div style={{ 
-                marginTop: '10px', 
-                display: 'flex', 
-                justifyContent: 'space-around',
-                backgroundColor: '#f5f5f5',
-                padding: '10px',
-                borderRadius: '5px'
-            }}>
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 'bold', color: '#922338' }}>
+            <div className="map-stats">
+                <div className="map-stat-item">
+                    <div className="map-stat-value">
                         {stations.length}
                     </div>
-                    <div style={{ fontSize: '12px' }}>Stations</div>
+                    <div className="map-stat-label">Stations</div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 'bold', color: '#922338' }}>
+                <div className="map-stat-item">
+                    <div className="map-stat-value">
                         {bikes.length}
                     </div>
-                    <div style={{ fontSize: '12px' }}>Bikes</div>
+                    <div className="map-stat-label">Bikes</div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 'bold', color: '#44aa44' }}>
+                <div className="map-stat-item">
+                    <div className="map-stat-value available">
                         {stations.filter(s => s.status === 'active' && s.bikesAvailable > 0).length}
                     </div>
-                    <div style={{ fontSize: '12px' }}>Available</div>
+                    <div className="map-stat-label">Available</div>
                 </div>
-                <div style={{ textAlign: 'center' }}>
-                    <div style={{ fontWeight: 'bold', color: '#ff4444' }}>
+                <div className="map-stat-item">
+                    <div className="map-stat-value out-of-service">
                         {stations.filter(s => s.status === 'out_of_service').length}
                     </div>
-                    <div style={{ fontSize: '12px' }}>Out of Service</div>
+                    <div className="map-stat-label">Out of Service</div>
                 </div>
             </div>
             </div>

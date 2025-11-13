@@ -1,0 +1,200 @@
+/* Animations */
+@keyframes slideUpBounce {
+    0% {
+        opacity: 0;
+        transform: translateY(50px) scale(0.9);
+    }
+    60% {
+        opacity: 0.8;
+        transform: translateY(-10px) scale(1.02);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes floatUp {
+    0% {
+        transform: translateY(0px) scale(1);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    }
+    100% {
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 15px 35px rgba(0, 123, 255, 0.4);
+    }
+}
+
+@keyframes glowPulse {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(0, 123, 255, 0.3);
+    }
+    50% {
+        box-shadow: 0 0 30px rgba(0, 123, 255, 0.6);
+    }
+}
+
+/* Page Container */
+.login-page {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #2c5aa0 0%, #1e3c72 100%);
+    background-image: url('https://cdn.road.cc/sites/default/files/styles/main_width/public/images/%5Bparent-node-gallery-title%5D/Barclays%20Cycle%20Hire%20Scheme%20bikes%20on%20hire%20station%20%C2%A9%20Simon%20MacMichael.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* Overlay */
+.login-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1;
+}
+
+/* Login Container */
+.login-container {
+    background-color: rgba(255, 255, 255, 0.95);
+    padding: 40px;
+    border-radius: 15px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    max-width: 400px;
+    width: 100%;
+    margin: 20px;
+    z-index: 2;
+    position: relative;
+    animation: slideUpBounce 0.8s ease-out;
+}
+
+/* Title */
+.login-title {
+    text-align: center;
+    margin-bottom: 30px;
+    color: #333;
+    font-size: 2rem;
+    font-weight: bold;
+    animation: slideUpBounce 1s ease-out 0.2s both;
+}
+
+/* Message */
+.login-message {
+    padding: 12px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: bold;
+}
+
+.login-message.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.login-message.error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+/* Form */
+.login-form {
+    animation: slideUpBounce 1s ease-out 0.4s both;
+}
+
+.login-field {
+    margin-bottom: 20px;
+}
+
+.login-field:last-of-type {
+    margin-bottom: 25px;
+}
+
+.login-label {
+    display: block;
+    margin-bottom: 8px;
+    color: #555;
+    font-weight: bold;
+}
+
+/* Input */
+.login-input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    box-sizing: border-box;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.login-input:focus {
+    border-color: #007bff;
+    outline: none;
+    transform: translateY(-3px) scale(1.02);
+    animation: glowPulse 2s infinite;
+}
+
+.login-input:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 15px rgba(0, 123, 255, 0.2);
+}
+
+/* Button */
+.login-button {
+    width: 100%;
+    padding: 14px;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    margin-bottom: 20px;
+}
+
+.login-button:hover:not(:disabled) {
+    animation: floatUp 0.3s ease-out forwards;
+    background-color: #0056b3;
+}
+
+.login-button:active {
+    transform: translateY(-4px) scale(0.98);
+    transition: all 0.1s ease-out;
+}
+
+.login-button:disabled {
+    background-color: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Footer */
+.login-footer {
+    text-align: center;
+    color: #666;
+    margin: 0;
+    animation: slideUpBounce 1s ease-out 0.6s both;
+}
+
+.login-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: bold;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.login-link:hover {
+    color: #0056b3;
+    transform: translateY(-1px);
+    text-shadow: 0 2px 4px rgba(0, 86, 179, 0.3);
+    text-decoration: underline;
+}
