@@ -542,6 +542,18 @@ const Profile = () => {
         }
     }, [hasIncompleteProfile, setIsEditing]);
 
+    // Listen for loyalty tier updates from other components (after return bike, etc)
+    useEffect(() => {
+        const handleTierUpdate = (event) => {
+            // The tier has been updated via context/localStorage, 
+            // component will re-render automatically from context change
+            console.log('Loyalty tier updated:', event.detail);
+        };
+
+        window.addEventListener('tierUpdated', handleTierUpdate);
+        return () => window.removeEventListener('tierUpdated', handleTierUpdate);
+    }, []);
+
 
     const handleChange = (e) => {
         setFormData({
@@ -926,6 +938,13 @@ const Profile = () => {
                                 <label style={labelStyle}>Role</label>
                                 <div style={displayValueStyle}>
                                     {user.role}
+                                </div>
+                            </div>
+
+                            <div style={fieldGroupStyle}>
+                                <label style={labelStyle}>Loyalty Tier</label>
+                                <div style={displayValueStyle}>
+                                    {user.loyaltyTier ? user.loyaltyTier.charAt(0).toUpperCase() + user.loyaltyTier.slice(1) : 'None'}
                                 </div>
                             </div>
                         </>

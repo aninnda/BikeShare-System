@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import TierNotification from './TierNotification';
 import './style/MyRentals.css';
 
 const MyRentals = () => {
@@ -62,6 +64,8 @@ const MyRentals = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [showReturnStations, setShowReturnStations] = useState(false);
     const [returnStations, setReturnStations] = useState([]);
+    const [tierNotification, setTierNotification] = useState(null);
+    const { updateUserLoyaltyTier } = useAuth();
 
     // Timer for countdown updates
     useEffect(() => {
@@ -377,6 +381,9 @@ const MyRentals = () => {
 
             const data = await response.json();
             
+            console.log('[Return Bike] Response data:', data);
+            console.log('[Return Bike] Tier notification:', data.tierNotification);
+            
             if (data.success) {
                 // Calculate rental duration for summary
                 const startTime = new Date(activeRental.startTime);
@@ -385,13 +392,30 @@ const MyRentals = () => {
                 const hours = Math.floor(durationMs / (1000 * 60 * 60));
                 const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
 
-                alert(
-                    `Bike ${activeRental.bikeId} successfully returned to ${stationName}!\n\n` +
-                    `Rental Summary:\n` +
-                    `Duration: ${hours}h ${minutes}m\n` +
-                    `Returned to: ${stationName} (Dock ${dockId})\n` +
-                    `Final cost will be calculated based on your rental duration.`
-                );
+                // Check if tier changed and show notification
+                if (data.tierNotification) {
+                    console.log('[Return Bike] Setting tier notification:', data.tierNotification);
+                    setTierNotification(data.tierNotification);
+                    updateUserLoyaltyTier(data.tierNotification.newTier);
+                    // Notify Profile component of tier update
+                    window.dispatchEvent(new CustomEvent('tierUpdated', {
+                        detail: { 
+                            oldTier: data.tierNotification.oldTier,
+                            newTier: data.tierNotification.newTier
+                        }
+                    }));
+                }
+
+                // Delay alert slightly to allow notification to render first
+                setTimeout(() => {
+                    alert(
+                        `Bike ${activeRental.bikeId} successfully returned to ${stationName}!\n\n` +
+                        `Rental Summary:\n` +
+                        `Duration: ${hours}h ${minutes}m\n` +
+                        `Returned to: ${stationName} (Dock ${dockId})\n` +
+                        `Final cost will be calculated based on your rental duration.`
+                    );
+                }, 100);
                 
                 // Clear local active rental
                 localStorage.removeItem('activeRental');
@@ -433,6 +457,11 @@ const MyRentals = () => {
 
     return (
         <div className="my-rentals-container">
+            <TierNotification 
+                notification={tierNotification}
+                onClose={() => setTierNotification(null)}
+            />
+            
             <div className="header">
                 <h1>My Rentals & Reservations</h1>
                 <p>Manage your active bike reservations and rentals</p>

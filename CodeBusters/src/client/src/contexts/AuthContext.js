@@ -38,11 +38,23 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('user');
     };
 
+    const updateUserLoyaltyTier = (loyaltyTier) => {
+        if (user) {
+            const updatedUser = {
+                ...user,
+                loyaltyTier
+            };
+            setUser(updatedUser);
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
+    };
+
     const value = {
         user,
         login,
         logout,
-        isLoading
+        isLoading,
+        updateUserLoyaltyTier
     };
 
     return (

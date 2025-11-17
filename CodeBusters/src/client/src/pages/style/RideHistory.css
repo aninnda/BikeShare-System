@@ -496,6 +496,16 @@
     color: #2c3e50;
 }
 
+.cost-item.discount-item {
+    color: #27ae60;
+    font-weight: 500;
+}
+
+.discount-amount {
+    color: #27ae60;
+    font-weight: 600;
+}
+
 .cost-divider {
     height: 2px;
     background: #e0e0e0;

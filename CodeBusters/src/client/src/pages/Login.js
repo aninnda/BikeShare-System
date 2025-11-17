@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import TierNotification from '../components/TierNotification';
 import './style/Login.css';
 
 const Login = () => {
@@ -10,6 +11,7 @@ const Login = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [tierNotification, setTierNotification] = useState(null);
     const { login } = useAuth();
     const navigate = useNavigate();
 
@@ -24,6 +26,7 @@ const Login = () => {
         e.preventDefault();
         setIsLoading(true);
         setMessage('');
+        setTierNotification(null);
 
         try {
             const response = await fetch('http://localhost:5001/api/login', {
@@ -38,13 +41,19 @@ const Login = () => {
 
             if (data.success) {
                 setMessage('Login successful! Redirecting...');
+                
+                // Show tier notification if user's tier changed
+                if (data.tierNotification) {
+                    setTierNotification(data.tierNotification);
+                }
+                
                 // Use the login function from AuthContext
                 login(data.user);
                 
-                // Redirect based on user role
+                // Redirect based on user role (with delay to show notification)
                 setTimeout(() => {
                     navigate('/');
-                }, 500);
+                }, data.tierNotification ? 2000 : 500);
             } else {
                 setMessage(data.message || 'Login failed');
             }
@@ -58,6 +67,11 @@ const Login = () => {
 
     return (
         <>
+            <TierNotification 
+                notification={tierNotification}
+                onClose={() => setTierNotification(null)}
+            />
+            
             <div className="login-page">
                 {/* Overlay for better text readability */}
                 <div className="login-overlay"></div>

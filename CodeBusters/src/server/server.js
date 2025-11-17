@@ -17,6 +17,7 @@ require('dotenv').config();
 const Database = require('./config/database');
 const BMSService = require('./services/bmsService');
 const ReservationService = require('./services/reservationService');
+const LoyaltyService = require('./services/loyaltyService');
 const createReservationRoutes = require('./routes/reservations');
 
 // Import BMS components for R-BMS-02 implementation
@@ -42,7 +43,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Global variables for services
-let db, bmsService, reservationService, bmsManager, configDatabaseService;
+let db, bmsService, reservationService, loyaltyService, bmsManager, configDatabaseService;
 
 // Billing calculation function
 function calculateRentalCost(startTime, endTime, bikeType) {
@@ -265,6 +266,7 @@ async function initializeApp() {
         // Initialize services
         bmsService = new BMSService(db);
         reservationService = new ReservationService(db, bmsService);
+        loyaltyService = new LoyaltyService(db);
         
         // Initialize BMS Manager for R-BMS-02 compliance
         bmsManager = new BMSManager();
@@ -675,6 +677,8 @@ function setupRoutes() {
                     rental_id INTEGER,
                     user_id INTEGER,
                     amount REAL,
+                    discount_amount REAL DEFAULT 0,
+                    discount_percentage INTEGER DEFAULT 0,
                     method TEXT,
                     status TEXT,
                     created_at TEXT
@@ -699,7 +703,9 @@ function setupRoutes() {
                         return res.status(400).json({ success: false, message: 'Only completed rentals can be charged' });
                     }
 
-                    const amount = Number(rental.total_cost || 0);
+                    let amount = Number(rental.total_cost || 0);
+                    let discountAmount = 0;
+                    let discountPercentage = 0;
 
                     if (amount <= 0) {
                         return res.status(400).json({ success: false, message: 'Nothing to charge for this rental' });
@@ -716,28 +722,44 @@ function setupRoutes() {
                             return res.json({ success: true, message: 'Rental already paid', payment: existingPayment });
                         }
 
-                        // Simulate external payment gateway call (synchronous stub for now)
-                        const payment = {
-                            rental_id: rentalId,
-                            user_id: rental.user_id,
-                            amount: amount,
-                            method: method,
-                            status: 'paid',
-                            created_at: new Date().toISOString()
-                        };
-
-                        db.run('INSERT INTO payments (rental_id, user_id, amount, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-                            [payment.rental_id, payment.user_id, payment.amount, payment.method, payment.status, payment.created_at], function(insertErr) {
-                                if (insertErr) {
-                                    console.error('Error recording payment:', insertErr);
-                                    return res.status(500).json({ success: false, message: 'Failed to record payment' });
+                        // Apply loyalty tier discount
+                        db.get('SELECT loyalty_tier FROM users WHERE id = ?', [rental.user_id], (tierErr, user) => {
+                            if (!tierErr && user && loyaltyService) {
+                                try {
+                                    const tierBenefits = loyaltyService.getTierBenefits(user.loyalty_tier || 'none');
+                                    discountPercentage = tierBenefits.discountPercentage;
+                                    discountAmount = Number((amount * (discountPercentage / 100)).toFixed(2));
+                                    amount = Number((amount - discountAmount).toFixed(2));
+                                } catch (error) {
+                                    console.error('Error applying loyalty discount:', error);
                                 }
-
-                                payment.id = this.lastID;
-                                // Return payment record
-                                return res.json({ success: true, message: 'Payment processed (stub)', payment });
                             }
-                        );
+
+                            // Simulate external payment gateway call (synchronous stub for now)
+                            const payment = {
+                                rental_id: rentalId,
+                                user_id: rental.user_id,
+                                amount: amount,
+                                discount_amount: discountAmount,
+                                discount_percentage: discountPercentage,
+                                method: method,
+                                status: 'paid',
+                                created_at: new Date().toISOString()
+                            };
+
+                            db.run('INSERT INTO payments (rental_id, user_id, amount, discount_amount, discount_percentage, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                [payment.rental_id, payment.user_id, payment.amount, payment.discount_amount, payment.discount_percentage, payment.method, payment.status, payment.created_at], function(insertErr) {
+                                    if (insertErr) {
+                                        console.error('Error recording payment:', insertErr);
+                                        return res.status(500).json({ success: false, message: 'Failed to record payment' });
+                                    }
+
+                                    payment.id = this.lastID;
+                                    // Return payment record
+                                    return res.json({ success: true, message: 'Payment processed (stub)', payment });
+                                }
+                            );
+                        });
                     });
                 });
             });
@@ -1294,6 +1316,84 @@ function setupRoutes() {
         });
     });
 
+    // Get user's loyalty tier and benefits
+    app.get('/api/users/:userId/loyalty', authenticateUser, requireRider, async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const headerUserId = req.user && req.user.id ? String(req.user.id) : null;
+
+            // Verify user is accessing their own loyalty info
+            if (String(userId) !== headerUserId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Riders can only view their own loyalty information'
+                });
+            }
+
+            if (!loyaltyService) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Loyalty service not initialized'
+                });
+            }
+
+            // Get user's current tier
+            let user;
+            try {
+                user = await loyaltyService.getUserData(userId);
+            } catch (dbError) {
+                console.error('Database error getting user:', dbError);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Database error retrieving user information'
+                });
+            }
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const currentTier = user.loyalty_tier || 'none';
+            const tierBenefits = loyaltyService.getTierBenefits(currentTier);
+
+            // Get loyalty history - gracefully handle if no history exists
+            let history = [];
+            try {
+                history = await loyaltyService.getLoyaltyHistory(userId, 5);
+            } catch (historyError) {
+                console.error('Error fetching loyalty history:', historyError);
+                // Don't fail - just return empty history
+                history = [];
+            }
+
+            res.json({
+                success: true,
+                loyalty: {
+                    currentTier,
+                    benefits: {
+                        discountPercentage: tierBenefits.discountPercentage,
+                        reservationExtensionMinutes: tierBenefits.reservationExtensionMinutes
+                    },
+                    tierDescriptions: {
+                        bronze: { discount: 5, extension: 0, name: 'Bronze' },
+                        silver: { discount: 10, extension: 2, name: 'Silver' },
+                        gold: { discount: 15, extension: 5, name: 'Gold' }
+                    }
+                },
+                history
+            });
+        } catch (error) {
+            console.error('Error fetching loyalty information:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error fetching loyalty information'
+            });
+        }
+    });
+
     // Add a new bike (operator only)
     app.post('/api/bikes', authenticateUser, requireOperator, (req, res) => {
         const { bike_id, model, location, battery_level } = req.body;
@@ -1544,7 +1644,7 @@ function setupRoutes() {
         );
     });
 
-    app.post('/api/login', (req, res) => {
+    app.post('/api/login', async (req, res) => {
         const { username, password } = req.body;
         
         if (!username || !password) {
@@ -1555,9 +1655,9 @@ function setupRoutes() {
         }
         
         db.get(
-            'SELECT id, username, role, first_name, last_name, email, address FROM users WHERE username = ? AND password = ?',
+            'SELECT id, username, role, first_name, last_name, email, address, loyalty_tier FROM users WHERE username = ? AND password = ?',
             [username, password],
-            (err, row) => {
+            async (err, row) => {
                 if (err) {
                     console.error('Database error:', err.message);
                     return res.status(500).json({ 
@@ -1573,6 +1673,39 @@ function setupRoutes() {
                         console.error('Error cleaning up orphaned reservations:', error);
                     });
                     
+                    // For riders, check and update loyalty tier
+                    let tierNotification = null;
+                    if (row.role === 'rider' && loyaltyService) {
+                        try {
+                            const currentTier = row.loyalty_tier || 'none';
+                            const newTier = await loyaltyService.calculateUserTier(row.id);
+                            const tierUpdateResult = await loyaltyService.updateUserTier(row.id, newTier);
+                            
+                            console.log(`[Login Tier Check] User ${row.id} - Current: ${currentTier}, New: ${newTier}, Changed: ${tierUpdateResult.tierChanged}`);
+                            
+                            if (tierUpdateResult.tierChanged) {
+                                // Determine if it's a promotion or demotion
+                                const tierOrder = { 'none': 0, 'bronze': 1, 'silver': 2, 'gold': 3 };
+                                const oldRank = tierOrder[tierUpdateResult.oldTier] || 0;
+                                const newRank = tierOrder[tierUpdateResult.newTier] || 0;
+                                const isPromotion = newRank > oldRank;
+                                
+                                tierNotification = {
+                                    type: isPromotion ? 'promotion' : 'demotion',
+                                    oldTier: tierUpdateResult.oldTier,
+                                    newTier: tierUpdateResult.newTier,
+                                    message: tierUpdateResult.reason
+                                };
+                                console.log(`[Login Tier Check] Tier notification created:`, tierNotification);
+                            }
+                            
+                            // Include current tier in response
+                            row.loyalty_tier = newTier;
+                        } catch (error) {
+                            console.error('Error checking loyalty tier:', error);
+                        }
+                    }
+                    
                     res.json({
                         success: true,
                         message: 'Login successful',
@@ -1583,8 +1716,10 @@ function setupRoutes() {
                             lastName: row.last_name,
                             email: row.email,
                             address: row.address,
-                            role: row.role
-                        }
+                            role: row.role,
+                            loyaltyTier: row.loyalty_tier || 'none'
+                        },
+                        tierNotification
                     });
                 } else {
                     res.status(401).json({
@@ -2107,68 +2242,81 @@ function setupRoutes() {
                                 });
                             }
 
-                            // Calculate reservation expiry (15 minutes default)
-                            const reservationHoldMinutes = 15;
-                            const expiryTime = new Date();
-                            expiryTime.setMinutes(expiryTime.getMinutes() + reservationHoldMinutes);
-
-                            // Reserve the bike
-                            db.run(
-                                `UPDATE r_bms_bikes 
-                                 SET status = 'reserved', 
-                                     reserved_by_user_id = ?, 
-                                     reservation_expiry = ?,
-                                     updated_at = CURRENT_TIMESTAMP
-                                 WHERE id = ? AND station_id = ?`,
-                                [userId, expiryTime.toISOString(), bikeId, stationId],
-                                function(updateErr) {
-                                    if (updateErr) {
-                                        console.error('Error reserving bike:', updateErr);
-                                        return res.status(500).json({
-                                            success: false,
-                                            message: 'Failed to reserve bike'
-                                        });
+                            // Calculate reservation expiry based on loyalty tier
+                            let reservationHoldMinutes = 15; // Default
+                            
+                            // Get user's loyalty tier for extension bonus
+                            db.get('SELECT loyalty_tier FROM users WHERE id = ?', [userId], (tierErr, tierUser) => {
+                                if (!tierErr && tierUser && loyaltyService) {
+                                    try {
+                                        const tierBenefits = loyaltyService.getTierBenefits(tierUser.loyalty_tier || 'none');
+                                        reservationHoldMinutes += tierBenefits.reservationExtensionMinutes;
+                                    } catch (error) {
+                                        console.error('Error applying loyalty extension:', error);
                                     }
+                                }
 
-                                    // Get station name for response
-                                    db.get(
-                                        'SELECT name FROM stations WHERE id = ?',
-                                        [stationId],
-                                        (stationErr, station) => {
-                                            const stationName = station ? station.name : 'Unknown Station';
-                                            
-                                            console.log(`Bike ${bikeId} reserved by user ${userId} at station ${stationId}`);
-                                            
-                                            // Log reservation activity
-                                            logUserActivity(userId, 'reservation', bikeId, stationId, {
-                                                bike_type: bike.type === 'electric' ? '⚡ E-Bike' : '🚴 Standard',
-                                                station_name: stationName,
-                                                expires_at: expiryTime.toISOString()
-                                            });
-                                            
-                                            res.json({
-                                                success: true,
-                                                message: 'Bike reserved successfully',
-                                                reservation: {
-                                                    bikeId: bikeId,
-                                                    bikeType: bike.type,
-                                                    stationId: stationId,
-                                                    stationName: stationName,
-                                                    reservedAt: new Date().toISOString(),
-                                                    expiresAt: expiryTime.toISOString(),
-                                                    holdTimeMinutes: reservationHoldMinutes,
-                                                    userId: userId
-                                                }
+                                const expiryTime = new Date();
+                                expiryTime.setMinutes(expiryTime.getMinutes() + reservationHoldMinutes);
+
+                                // Reserve the bike
+                                db.run(
+                                    `UPDATE r_bms_bikes 
+                                     SET status = 'reserved', 
+                                         reserved_by_user_id = ?, 
+                                         reservation_expiry = ?,
+                                         updated_at = CURRENT_TIMESTAMP
+                                     WHERE id = ? AND station_id = ?`,
+                                    [userId, expiryTime.toISOString(), bikeId, stationId],
+                                    function(updateErr) {
+                                        if (updateErr) {
+                                            console.error('Error reserving bike:', updateErr);
+                                            return res.status(500).json({
+                                                success: false,
+                                                message: 'Failed to reserve bike'
                                             });
                                         }
-                                    );
-                                }
-                            );
-                        }
-                    );
-                }
-            );
-            
+
+                                        // Get station name for response
+                                        db.get(
+                                            'SELECT name FROM stations WHERE id = ?',
+                                            [stationId],
+                                            (stationErr, station) => {
+                                                const stationName = station ? station.name : 'Unknown Station';
+                                                
+                                                console.log(`Bike ${bikeId} reserved by user ${userId} at station ${stationId}`);
+                                                
+                                                // Log reservation activity
+                                                logUserActivity(userId, 'reservation', bikeId, stationId, {
+                                                    bike_type: bike.type === 'electric' ? '⚡ E-Bike' : '🚴 Standard',
+                                                    station_name: stationName,
+                                                    expires_at: expiryTime.toISOString()
+                                                });
+                                                
+                                                res.json({
+                                                    success: true,
+                                                    message: 'Bike reserved successfully',
+                                                    reservation: {
+                                                        bikeId: bikeId,
+                                                        bikeType: bike.type,
+                                                        stationId: stationId,
+                                                        stationName: stationName,
+                                                        reservedAt: new Date().toISOString(),
+                                                        expiresAt: expiryTime.toISOString(),
+                                                        holdTimeMinutes: reservationHoldMinutes,
+                                                        userId: userId
+                                                    }
+                                                });
+                                            }
+                                        );
+                                    }
+                                );
+                            }
+                        );
+                    }
+                );
+            }
+        );
         } catch (error) {
             console.error('Error reserving bike:', error);
             res.status(500).json({
@@ -2668,6 +2816,32 @@ function setupRoutes() {
     });
 
     // Health check
+    // Loyalty tier maintenance endpoint (for periodic checks)
+    app.post('/api/loyalty/check-all', authenticateUser, requireOperator, async (req, res) => {
+        try {
+            if (!loyaltyService) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Loyalty service not initialized'
+                });
+            }
+
+            const result = await loyaltyService.checkAllUsersTiers();
+            
+            res.json({
+                success: true,
+                message: 'Loyalty tier check completed',
+                result
+            });
+        } catch (error) {
+            console.error('Error checking loyalty tiers:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error checking loyalty tiers'
+            });
+        }
+    });
+
     app.get('/health', (req, res) => {
         res.json({ status: 'OK', timestamp: new Date().toISOString() });
     });
@@ -2870,95 +3044,162 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                                         }
                                     }
 
-                                    // Get bike type for billing calculation
+                                    // Get bike type AND user tier for billing & discount calculation
                                     db.get(
                                         'SELECT type FROM r_bms_bikes WHERE id = ?',
                                         [bikeId],
-                                        (bikeErr, bike) => {
+                                        (bikeErr, bikeData) => {
                                             if (bikeErr) {
-                                                console.error('Error getting bike type:', bikeErr);
+                                                console.error('Error getting bike data:', bikeErr);
                                                 // Continue without billing info
                                             }
 
-                                            const endTime = new Date().toISOString();
-                                            let billingInfo = null;
-                                            
-                                            // Calculate billing if we have bike type
-                                            if (bike && bike.type) {
-                                                billingInfo = calculateRentalCost(rental.start_time, endTime, bike.type);
-                                            }
-
-                                            // End the rental with billing information
-                                            // Ensure rentals table has end_station_id column (SQLite: safe to attempt add)
-                                            db.run('ALTER TABLE rentals ADD COLUMN end_station_id TEXT', [], (alterErr) => {
-                                                // ignore alterErr (column may already exist)
-
-                                                // End the rental with billing information and record end station
-                                                const updateQuery = billingInfo ?
-                                                    'UPDATE rentals SET status = ?, end_time = ?, total_cost = ?, end_station_id = ? WHERE id = ?' :
-                                                    'UPDATE rentals SET status = ?, end_time = ?, end_station_id = ? WHERE id = ?';
-
-                                                const updateParams = billingInfo ?
-                                                    ['completed', endTime, billingInfo.totalCost, stationId, rental.id] :
-                                                    ['completed', endTime, stationId, rental.id];
-
-                                                db.run(updateQuery, updateParams, function(rentalErr) {
-                                                    if (rentalErr) {
-                                                        console.error('Error ending rental:', rentalErr);
-                                                        // Rollback bike status
-                                                        db.run('UPDATE r_bms_bikes SET status = ?, station_id = ? WHERE id = ?', 
-                                                               ['on_trip', null, bikeId]);
-                                                        return resolve({
-                                                            success: false,
-                                                            message: 'Failed to end rental'
-                                                        });
-                                                    }
-
-                                                    const duration = Date.now() - new Date(rental.start_time).getTime();
-                                                    console.log(`SUCCESS: Bike ${bikeId} returned to station ${stationId} by user ${userId}`);
+                                            // Now get user tier for discount
+                                            db.get(
+                                                'SELECT loyalty_tier FROM users WHERE id = ?',
+                                                [userId],
+                                                (tierErr, tierData) => {
+                                                    const endTime = new Date().toISOString();
+                                                    let billingInfo = null;
+                                                    let finalCost = 0;
                                                     
-                                                    // Log rental completion activity
-                                                    const durationMinutes = Math.ceil(duration / (1000 * 60));
-                                                    const durationHours = Math.floor(durationMinutes / 60);
-                                                    const durationMins = durationMinutes % 60;
-                                                    const durationText = durationHours > 0 ? `${durationHours}h ${durationMins}m` : `${durationMins}m`;
-                                                    
-                                                    logUserActivity(userId, 'rental_completed', bikeId, stationId, {
-                                                        bike_type: bike.type === 'electric' ? '⚡ E-Bike' : '🚴 Standard',
-                                                        bike_type_raw: bike.type, // Add raw type for frontend logic
-                                                        return_station_id: stationId,
-                                                        pickup_station_id: rental.station_id,
-                                                        duration: durationText,
-                                                        duration_minutes: durationMinutes, // Add duration in minutes
-                                                        cost: billingInfo ? billingInfo.totalCost : 0
-                                                    });
-                                                    
-                                                    const response = {
-                                                        success: true,
-                                                        message: `Bike ${bikeId} successfully returned to station ${stationId}`,
-                                                        return: {
-                                                            bikeId,
-                                                            stationId,
-                                                            userId,
-                                                            endTime,
-                                                            duration
+                                                    // Calculate billing if we have bike type
+                                                    if (bikeData && bikeData.type) {
+                                                        billingInfo = calculateRentalCost(rental.start_time, endTime, bikeData.type);
+                                                        finalCost = billingInfo.totalCost;
+                                                        
+                                                        // Apply loyalty tier discount
+                                                        if (loyaltyService && tierData) {
+                                                            try {
+                                                                const userLoyaltyTier = tierData.loyalty_tier || 'none';
+                                                                const tierBenefits = loyaltyService.getTierBenefits(userLoyaltyTier);
+                                                                const discountPercentage = tierBenefits.discountPercentage;
+                                                                if (discountPercentage > 0) {
+                                                                    const discountAmount = Number((finalCost * (discountPercentage / 100)).toFixed(2));
+                                                                    finalCost = Number((finalCost - discountAmount).toFixed(2));
+                                                                    console.log(`Discount applied: ${userLoyaltyTier} tier - ${discountPercentage}% off. Original: $${billingInfo.totalCost}, Final: $${finalCost}`);
+                                                                }
+                                                            } catch (error) {
+                                                                console.error('Error applying discount:', error);
+                                                            }
                                                         }
-                                                    };
-
-                                                    // Add billing info to response if available
-                                                    if (billingInfo) {
-                                                        response.billing = {
-                                                            totalCost: billingInfo.totalCost,
-                                                            durationMinutes: billingInfo.durationMinutes,
-                                                            ratePerMinute: billingInfo.ratePerMinute,
-                                                            bikeType: bike.type
-                                                        };
-                                                        response.message += ` - Total charge: $${billingInfo.totalCost.toFixed(2)} for ${billingInfo.durationMinutes} minutes`;
                                                     }
 
-                                                    resolve(response);
-                                                });
-                                            });
+                                                    // End the rental with billing information
+                                                    // Ensure rentals table has end_station_id column (SQLite: safe to attempt add)
+                                                    db.run('ALTER TABLE rentals ADD COLUMN end_station_id TEXT', [], (alterErr) => {
+                                                        // ignore alterErr (column may already exist)
+
+                                                        // End the rental with billing information and record end station
+                                                        const updateQuery = billingInfo ?
+                                                            'UPDATE rentals SET status = ?, end_time = ?, total_cost = ?, end_station_id = ? WHERE id = ?' :
+                                                            'UPDATE rentals SET status = ?, end_time = ?, end_station_id = ? WHERE id = ?';
+
+                                                        const updateParams = billingInfo ?
+                                                            ['completed', endTime, finalCost, stationId, rental.id] :
+                                                            ['completed', endTime, stationId, rental.id];
+
+                                                        db.run(updateQuery, updateParams, function(rentalErr) {
+                                                            if (rentalErr) {
+                                                                console.error('Error ending rental:', rentalErr);
+                                                                // Rollback bike status
+                                                                db.run('UPDATE r_bms_bikes SET status = ?, station_id = ? WHERE id = ?', 
+                                                                       ['on_trip', null, bikeId]);
+                                                                return resolve({
+                                                                    success: false,
+                                                                    message: 'Failed to end rental'
+                                                                });
+                                                            }
+
+                                                            const duration = Date.now() - new Date(rental.start_time).getTime();
+                                                            console.log(`SUCCESS: Bike ${bikeId} returned to station ${stationId} by user ${userId}`);
+                                                            
+                                                            // Log rental completion activity
+                                                            const durationMinutes = Math.ceil(duration / (1000 * 60));
+                                                            const durationHours = Math.floor(durationMinutes / 60);
+                                                            const durationMins = durationMinutes % 60;
+                                                            const durationText = durationHours > 0 ? `${durationHours}h ${durationMins}m` : `${durationMins}m`;
+                                                            
+                                                            logUserActivity(userId, 'rental_completed', bikeId, stationId, {
+                                                                bike_type: bikeData?.type === 'electric' ? '⚡ E-Bike' : '🚴 Standard',
+                                                                bike_type_raw: bikeData?.type, // Add raw type for frontend logic
+                                                                return_station_id: stationId,
+                                                                pickup_station_id: rental.station_id,
+                                                                duration: durationText,
+                                                                duration_minutes: durationMinutes, // Add duration in minutes
+                                                                cost: billingInfo ? billingInfo.totalCost : 0
+                                                            });
+                                                            
+                                                            const response = {
+                                                                success: true,
+                                                                message: `Bike ${bikeId} successfully returned to station ${stationId}`,
+                                                                return: {
+                                                                    bikeId,
+                                                                    stationId,
+                                                                    userId,
+                                                                    endTime,
+                                                                    duration
+                                                                }
+                                                            };
+
+                                                            // Add billing info to response if available
+                                                            if (billingInfo) {
+                                                                response.billing = {
+                                                                    totalCost: finalCost,
+                                                                    originalCost: billingInfo.totalCost,
+                                                                    durationMinutes: billingInfo.durationMinutes,
+                                                                    ratePerMinute: billingInfo.ratePerMinute,
+                                                                    bikeType: bikeData?.type
+                                                                };
+                                                                response.message += ` - Total charge: $${finalCost.toFixed(2)} for ${billingInfo.durationMinutes} minutes`;
+                                                            }
+
+                                                            // Calculate new tier after successful return
+                                                            if (loyaltyService) {
+                                                                try {
+                                                                    // Get current tier before calculating new one
+                                                                    db.get('SELECT loyalty_tier FROM users WHERE id = ?', [userId], async (tierErr, tierData) => {
+                                                                        const oldTier = tierData?.loyalty_tier || 'none';
+                                                                        
+                                                                        // Calculate new tier
+                                                                        const newTier = await loyaltyService.calculateUserTier(userId);
+                                                                        console.log(`[Return/Tier] User ${userId}: Old tier: ${oldTier}, New tier: ${newTier}`);
+                                                                        
+                                                                        // If tier changed, update and include notification
+                                                                        if (oldTier !== newTier) {
+                                                                            console.log(`[Return/Tier] Tier changed - updating from ${oldTier} to ${newTier}`);
+                                                                            await loyaltyService.updateUserTier(userId, newTier);
+                                                                            
+                                                                            const isPromotion = (oldTier === 'none' || 
+                                                                                (oldTier === 'bronze' && (newTier === 'silver' || newTier === 'gold')) ||
+                                                                                (oldTier === 'silver' && newTier === 'gold'));
+                                                                            
+                                                                            response.tierNotification = {
+                                                                                type: isPromotion ? 'promotion' : 'demotion',
+                                                                                oldTier,
+                                                                                newTier,
+                                                                                message: isPromotion 
+                                                                                    ? `Great job! You've been promoted to ${newTier.charAt(0).toUpperCase() + newTier.slice(1)} tier!`
+                                                                                    : `Your tier has changed to ${newTier.charAt(0).toUpperCase() + newTier.slice(1)}`
+                                                                            };
+                                                                            console.log(`[Return/Tier] Created notification:`, response.tierNotification);
+                                                                        } else {
+                                                                            console.log(`[Return/Tier] No tier change detected`);
+                                                                        }
+                                                                        
+                                                                        resolve(response);
+                                                                    });
+                                                                } catch (tierError) {
+                                                                    console.error('Error calculating loyalty tier:', tierError);
+                                                                    resolve(response); // Still return success even if tier calc fails
+                                                                }
+                                                            } else {
+                                                                resolve(response);
+                                                            }
+                                                        });
+                                                    });
+                                                }
+                                            );
                                         }
                                     );
                                 }
