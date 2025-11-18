@@ -17,6 +17,7 @@ require('dotenv').config();
 const Database = require('./config/database');
 const BMSService = require('./services/bmsService');
 const ReservationService = require('./services/reservationService');
+const FlexDollarsService = require('./src/services/flexDollarsService');
 const createReservationRoutes = require('./routes/reservations');
 
 // Import BMS components for R-BMS-02 implementation
@@ -42,7 +43,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Global variables for services
-let db, bmsService, reservationService, bmsManager, configDatabaseService;
+let db, bmsService, reservationService, bmsManager, configDatabaseService, flexDollarsService;
 
 // Billing calculation function
 function calculateRentalCost(startTime, endTime, bikeType) {
@@ -266,8 +267,14 @@ async function initializeApp() {
         bmsService = new BMSService(db);
         reservationService = new ReservationService(db, bmsService);
         
+        // Initialize Flex Dollars Service (DM-03, DM-04)
+        flexDollarsService = new FlexDollarsService(db);
+        
         // Initialize BMS Manager for R-BMS-02 compliance
         bmsManager = new BMSManager();
+        
+        // Connect FlexDollarsService to BMSManager for flex dollars rewards
+        bmsManager.setFlexDollarsService(flexDollarsService);
         
         // R-BMS-01: Initialize Configuration Database Service
         configDatabaseService = new ConfigDatabaseService(db);
@@ -598,6 +605,7 @@ function setupRoutes() {
     });
 
     // Billing history for a user (riders only) - R-PRC-04 / R-PRC-05
+    // DM-03, DM-04: Include flex dollars applied information
     app.get('/api/users/:userId/billing', authenticateUser, requireRider, (req, res) => {
         const { userId } = req.params;
 
@@ -610,58 +618,88 @@ function setupRoutes() {
         const limit = req.query.limit ? parseInt(req.query.limit) : 50;
         const offset = req.query.offset ? parseInt(req.query.offset) : 0;
 
-        // Query completed rentals for user and include start/end station names and bike type
-        db.all(`
-            SELECT 
-                r.id,
-                r.bike_id,
-                r.start_time,
-                r.end_time,
-                r.total_cost,
-                r.station_id AS start_station_id,
-                s1.name AS start_station_name,
-                r.end_station_id AS end_station_id,
-                s2.name AS end_station_name,
-                b.type AS bike_type
-            FROM rentals r
-            LEFT JOIN stations s1 ON r.station_id = s1.id
-            LEFT JOIN stations s2 ON r.end_station_id = s2.id
-            LEFT JOIN r_bms_bikes b ON r.bike_id = b.id
-            WHERE r.user_id = ? AND r.status = 'completed'
-            ORDER BY r.start_time DESC
-            LIMIT ? OFFSET ?
-        `, [userId, limit, offset], (err, rows) => {
-            if (err) {
-                console.error('Error fetching billing history:', err);
-                return res.status(500).json({ success: false, message: 'Database error fetching billing history' });
+        // Ensure payments table exists for flex dollars tracking
+        db.run(`CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rental_id INTEGER,
+            user_id INTEGER,
+            amount REAL,
+            flex_dollars_applied REAL DEFAULT 0,
+            amount_due_after_flex REAL,
+            method TEXT,
+            status TEXT,
+            created_at TEXT
+        )`, (createErr) => {
+            if (createErr) {
+                console.error('Error creating payments table:', createErr);
+                // Continue anyway, table might already exist
             }
 
-            // For each rental attempt to compute deterministic breakdown using calculateRentalCost
-            const results = rows.map(row => {
-                const breakdown = row.end_time && row.start_time && row.bike_type ? calculateRentalCost(row.start_time, row.end_time, row.bike_type) : null;
+            // Query completed rentals for user and include start/end station names and flex dollars applied
+            // Note: We don't JOIN to r_bms_bikes as it may not have all bike types
+            db.all(`
+                SELECT 
+                    r.id,
+                    r.bike_id,
+                    r.start_time,
+                    r.end_time,
+                    r.total_cost,
+                    r.station_id AS start_station_id,
+                    s1.name AS start_station_name,
+                    r.end_station_id AS end_station_id,
+                    s2.name AS end_station_name,
+                    COALESCE(p.flex_dollars_applied, 0) as flex_dollars_applied,
+                    p.amount_due_after_flex
+                FROM rentals r
+                LEFT JOIN stations s1 ON r.station_id = s1.id
+                LEFT JOIN stations s2 ON r.end_station_id = s2.id
+                LEFT JOIN payments p ON r.id = p.rental_id
+                WHERE r.user_id = ? AND r.status = 'completed'
+                ORDER BY r.start_time DESC
+                LIMIT ? OFFSET ?
+            `, [userId, limit, offset], (err, rows) => {
+                if (err) {
+                    console.error('Error fetching billing history:', err);
+                    return res.status(500).json({ success: false, message: 'Database error fetching billing history', error: err.message });
+                }
 
-                return {
-                    rentalId: row.id,
-                    bikeId: row.bike_id,
-                    bikeType: row.bike_type || 'standard',
-                    startTime: row.start_time,
-                    endTime: row.end_time,
-                    originStation: {
-                        id: row.start_station_id,
-                        name: row.start_station_name || null
-                    },
-                    arrivalStation: row.end_station_id ? { id: row.end_station_id, name: row.end_station_name || null } : null,
-                    totalCost: row.total_cost != null ? Number(row.total_cost) : (breakdown ? breakdown.totalCost : null),
-                    breakdown: breakdown,
-                };
+                // For each rental attempt to compute deterministic breakdown using calculateRentalCost
+                const results = rows.map(row => {
+                    // Determine bike type from bike_id pattern
+                    const bikeIdNum = parseInt(row.bike_id.replace('BIKE', ''));
+                    const eBikeIds = [2, 5, 7, 10, 12, 14, 17, 19, 21, 23, 24, 27, 29, 32, 34, 36, 37, 39, 42, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61, 64, 66, 68, 70, 72, 74, 76];
+                    const bikeType = eBikeIds.includes(bikeIdNum) ? 'electric' : 'standard';
+
+                    const breakdown = row.end_time && row.start_time ? calculateRentalCost(row.start_time, row.end_time, bikeType) : null;
+                    const flexDollarsApplied = Number(row.flex_dollars_applied) || 0;
+                    const amountDueAfterFlex = row.amount_due_after_flex;
+
+                    return {
+                        rentalId: row.id,
+                        bikeId: row.bike_id,
+                        bikeType: bikeType,
+                        startTime: row.start_time,
+                        endTime: row.end_time,
+                        originStation: {
+                            id: row.start_station_id,
+                            name: row.start_station_name || null
+                        },
+                        arrivalStation: row.end_station_id ? { id: row.end_station_id, name: row.end_station_name || null } : null,
+                        totalCost: row.total_cost != null ? Number(row.total_cost) : (breakdown ? breakdown.totalCost : null),
+                        breakdown: breakdown,
+                        flexDollarsApplied: flexDollarsApplied,
+                        amountDueAfterFlex: amountDueAfterFlex != null ? Number(amountDueAfterFlex) : null
+                    };
+                });
+
+                res.json({ success: true, total: results.length, billing: results });
             });
-
-            res.json({ success: true, total: results.length, billing: results });
         });
     });
 
             // Payment processing stub (riders only) - lightweight interface to external payment service
-            app.post('/api/payments/charge', authenticateUser, requireRider, (req, res) => {
+            // DM-03, DM-04: Automatically applies flex dollars to rental charges
+            app.post('/api/payments/charge', authenticateUser, requireRider, async (req, res) => {
                 const { rentalId, method = 'card' } = req.body;
                 const headerUserId = req.user && req.user.id ? String(req.user.id) : null;
 
@@ -675,13 +713,15 @@ function setupRoutes() {
                     rental_id INTEGER,
                     user_id INTEGER,
                     amount REAL,
+                    flex_dollars_applied REAL DEFAULT 0,
+                    amount_due_after_flex REAL,
                     method TEXT,
                     status TEXT,
                     created_at TEXT
                 )`);
 
                 // Lookup rental
-                db.get('SELECT * FROM rentals WHERE id = ?', [rentalId], (err, rental) => {
+                db.get('SELECT * FROM rentals WHERE id = ?', [rentalId], async (err, rental) => {
                     if (err) {
                         console.error('Error looking up rental for payment:', err);
                         return res.status(500).json({ success: false, message: 'Database error' });
@@ -699,45 +739,128 @@ function setupRoutes() {
                         return res.status(400).json({ success: false, message: 'Only completed rentals can be charged' });
                     }
 
-                    const amount = Number(rental.total_cost || 0);
+                    const totalCost = Number(rental.total_cost || 0);
 
-                    if (amount <= 0) {
+                    if (totalCost <= 0) {
                         return res.status(400).json({ success: false, message: 'Nothing to charge for this rental' });
                     }
 
                     // Check for existing paid payment
-                    db.get('SELECT * FROM payments WHERE rental_id = ? AND status = ?', [rentalId, 'paid'], (pErr, existingPayment) => {
+                    db.get('SELECT * FROM payments WHERE rental_id = ? AND status = ?', [rentalId, 'paid'], async (pErr, existingPayment) => {
                         if (pErr) {
                             console.error('Error checking existing payments:', pErr);
                             return res.status(500).json({ success: false, message: 'Database error' });
                         }
 
                         if (existingPayment) {
-                            return res.json({ success: true, message: 'Rental already paid', payment: existingPayment });
+                            return res.json({ 
+                                success: true, 
+                                message: 'Rental already paid', 
+                                payment: existingPayment,
+                                flexDollarsApplied: existingPayment.flex_dollars_applied || 0
+                            });
                         }
 
-                        // Simulate external payment gateway call (synchronous stub for now)
-                        const payment = {
-                            rental_id: rentalId,
-                            user_id: rental.user_id,
-                            amount: amount,
-                            method: method,
-                            status: 'paid',
-                            created_at: new Date().toISOString()
-                        };
+                        // DM-03, DM-04: Apply flex dollars to this rental charge
+                        try {
+                            const flexResult = await flexDollarsService.deductFlexDollars(
+                                rental.user_id,
+                                totalCost,
+                                `Payment for rental #${rentalId}`,
+                                rentalId
+                            );
 
-                        db.run('INSERT INTO payments (rental_id, user_id, amount, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-                            [payment.rental_id, payment.user_id, payment.amount, payment.method, payment.status, payment.created_at], function(insertErr) {
-                                if (insertErr) {
-                                    console.error('Error recording payment:', insertErr);
-                                    return res.status(500).json({ success: false, message: 'Failed to record payment' });
+                            const flexDollarsApplied = flexResult.amountDeducted;
+                            const amountDueAfterFlex = flexResult.remainingBalance;
+
+                            console.log(`Flex dollars applied: $${flexDollarsApplied.toFixed(2)} towards rental #${rentalId}. Remaining to pay: $${amountDueAfterFlex.toFixed(2)}`);
+
+                            // Simulate external payment gateway call for remaining balance only
+                            const payment = {
+                                rental_id: rentalId,
+                                user_id: rental.user_id,
+                                amount: totalCost,
+                                flex_dollars_applied: flexDollarsApplied,
+                                amount_due_after_flex: amountDueAfterFlex,
+                                method: amountDueAfterFlex > 0 ? method : 'flex_dollars', // Method is flex_dollars if fully paid by flex
+                                status: 'paid',
+                                created_at: new Date().toISOString()
+                            };
+
+                            db.run('INSERT INTO payments (rental_id, user_id, amount, flex_dollars_applied, amount_due_after_flex, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                [payment.rental_id, payment.user_id, payment.amount, payment.flex_dollars_applied, payment.amount_due_after_flex, payment.method, payment.status, payment.created_at], 
+                                function(insertErr) {
+                                    if (insertErr) {
+                                        console.error('Error recording payment:', insertErr);
+                                        return res.status(500).json({ success: false, message: 'Failed to record payment' });
+                                    }
+
+                                    payment.id = this.lastID;
+                                    
+                                    let message = 'Payment processed successfully';
+                                    if (flexDollarsApplied > 0) {
+                                        message += ` - Applied $${flexDollarsApplied.toFixed(2)} flex dollars`;
+                                        if (amountDueAfterFlex > 0) {
+                                            message += ` - $${amountDueAfterFlex.toFixed(2)} charged to ${method}`;
+                                        } else {
+                                            message += ` - Fully paid with flex dollars!`;
+                                        }
+                                    }
+                                    
+                                    return res.json({ 
+                                        success: true, 
+                                        message: message, 
+                                        payment: {
+                                            id: payment.id,
+                                            rentalId: payment.rental_id,
+                                            totalCost: payment.amount,
+                                            flexDollarsApplied: payment.flex_dollars_applied,
+                                            amountDue: payment.amount_due_after_flex,
+                                            method: payment.method,
+                                            status: payment.status
+                                        }
+                                    });
                                 }
+                            );
+                        } catch (flexError) {
+                            console.error('Error applying flex dollars:', flexError);
+                            // If flex dollars fails, fall back to regular payment
+                            const payment = {
+                                rental_id: rentalId,
+                                user_id: rental.user_id,
+                                amount: totalCost,
+                                flex_dollars_applied: 0,
+                                amount_due_after_flex: totalCost,
+                                method: method,
+                                status: 'paid',
+                                created_at: new Date().toISOString()
+                            };
 
-                                payment.id = this.lastID;
-                                // Return payment record
-                                return res.json({ success: true, message: 'Payment processed (stub)', payment });
-                            }
-                        );
+                            db.run('INSERT INTO payments (rental_id, user_id, amount, flex_dollars_applied, amount_due_after_flex, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                [payment.rental_id, payment.user_id, payment.amount, payment.flex_dollars_applied, payment.amount_due_after_flex, payment.method, payment.status, payment.created_at], 
+                                function(insertErr) {
+                                    if (insertErr) {
+                                        console.error('Error recording payment:', insertErr);
+                                        return res.status(500).json({ success: false, message: 'Failed to record payment' });
+                                    }
+
+                                    payment.id = this.lastID;
+                                    return res.json({ 
+                                        success: true, 
+                                        message: `Payment processed (flex dollars unavailable) - $${totalCost.toFixed(2)} charged to ${method}`, 
+                                        payment: {
+                                            id: payment.id,
+                                            rentalId: payment.rental_id,
+                                            totalCost: payment.amount,
+                                            flexDollarsApplied: 0,
+                                            amountDue: totalCost,
+                                            method: payment.method,
+                                            status: payment.status
+                                        }
+                                    });
+                                }
+                            );
+                        }
                     });
                 });
             });
@@ -2851,7 +2974,7 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                             db.run(
                                 'UPDATE r_bms_bikes SET status = ?, station_id = ? WHERE id = ?',
                                 ['available', stationId, bikeId],
-                                function(updateErr) {
+                                async function(updateErr) {
                                     if (updateErr) {
                                         console.error('Error updating bike status:', updateErr);
                                         return resolve({
@@ -2861,6 +2984,48 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                                     }
 
                                     // --- Update in-memory bmsManager state ---
+                                    // Also check for flex dollars eligibility (DM-03, DM-04)
+                                    let flexDollarsAwarded = null;
+                                    if (bmsManager && bmsManager.stations && bmsManager.bikes) {
+                                        const station = bmsManager.stations.get(stationId);
+                                        const bikeMem = bmsManager.bikes.get(bikeId);
+                                        if (station && bikeMem) {
+                                            station.dockedBikes.set(bikeId, bikeMem);
+                                            bikeMem.status = 'available';
+                                            
+                                            // Check if station is below 25% occupancy after return
+                                            if (flexDollarsService) {
+                                                const stationInfo = station.getStationInfo();
+                                                const occupiedDocks = stationInfo.numberOfBikesDocked;
+                                                const totalCapacity = stationInfo.capacity;
+                                                
+                                                if (flexDollarsService.isBelowMinimumOccupancy(occupiedDocks, totalCapacity)) {
+                                                    try {
+                                                        const rewardAmount = flexDollarsService.getRewardAmount();
+                                                        const awardResult = await flexDollarsService.awardFlexDollars(
+                                                            userId,
+                                                            rewardAmount,
+                                                            `Bike returned to ${station.name} (${occupiedDocks}/${totalCapacity} capacity)`,
+                                                            null,
+                                                            stationId
+                                                        );
+                                                        
+                                                        if (awardResult.success) {
+                                                            flexDollarsAwarded = {
+                                                                amount: rewardAmount,
+                                                                reason: `Station below 25% capacity (${Math.round((occupiedDocks / totalCapacity) * 100)}% occupied)`,
+                                                                newBalance: awardResult.newBalance
+                                                            };
+                                                            console.log(` Flex dollars awarded: $${rewardAmount.toFixed(2)} to user ${userId}`);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(`Error awarding flex dollars: ${error.message}`);
+                                                        // Don't fail the return due to flex dollars error
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                     if (bmsManager && bmsManager.stations && bmsManager.bikes) {
                                         const station = bmsManager.stations.get(stationId);
                                         const bikeMem = bmsManager.bikes.get(bikeId);
@@ -2954,6 +3119,12 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                                                             bikeType: bike.type
                                                         };
                                                         response.message += ` - Total charge: $${billingInfo.totalCost.toFixed(2)} for ${billingInfo.durationMinutes} minutes`;
+                                                    }
+
+                                                    // Add flex dollars info if awarded
+                                                    if (flexDollarsAwarded) {
+                                                        response.flexDollars = flexDollarsAwarded;
+                                                        response.message += ` - Earned $${flexDollarsAwarded.amount.toFixed(2)} flex dollars for supporting our network!`;
                                                     }
 
                                                     resolve(response);
@@ -3056,6 +3227,61 @@ process.on('SIGINT', async () => {
     }
     
     process.exit(0);
+});
+
+// ===== FLEX DOLLARS ENDPOINTS (DM-03, DM-04) =====
+
+// Get flex dollars balance for a rider (riders only)
+app.get('/api/flex-dollars/balance', authenticateUser, requireRider, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const balance = await flexDollarsService.getBalance(userId);
+        
+        res.json({
+            success: true,
+            message: 'Flex dollars balance retrieved',
+            balance: balance.balance,
+            formattedBalance: `$${balance.balance.toFixed(2)}`,
+            userId: userId
+        });
+    } catch (error) {
+        console.error('Error retrieving flex dollars balance:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error retrieving flex dollars balance',
+            error: error.message
+        });
+    }
+});
+
+// Get flex dollars transaction history (riders only)
+app.get('/api/flex-dollars/history', authenticateUser, requireRider, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+        const offset = req.query.offset ? parseInt(req.query.offset) : 0;
+        
+        const history = await flexDollarsService.getTransactionHistory(userId, limit, offset);
+        
+        res.json({
+            success: true,
+            message: 'Flex dollars transaction history retrieved',
+            userId: userId,
+            transactions: history.transactions,
+            totalCount: history.totalCount,
+            pagination: {
+                limit: history.limit,
+                offset: history.offset
+            }
+        });
+    } catch (error) {
+        console.error('Error retrieving flex dollars history:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error retrieving transaction history',
+            error: error.message
+        });
+    }
 });
 
 // Notifications: Get empty/full docking station notifications for user profile

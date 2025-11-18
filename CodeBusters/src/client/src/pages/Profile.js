@@ -461,13 +461,28 @@ const Billing = ({ userId }) => {
                 {billing.map(item => (
                     <div key={item.rentalId} style={{ padding: 12, marginBottom: 10, background: 'white', borderRadius: 8, border: '1px solid #e9ecef' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <div>
+                            <div style={{ flex: 1 }}>
                                 <div style={{ fontWeight: 700 }}>🚲 {item.bikeId} <span style={{ fontWeight: 400, color: '#6c757d' }}>{item.bikeType}</span></div>
                                 <div style={{ color: '#6c757d', fontSize: '0.9rem' }}>{new Date(item.startTime).toLocaleString()} → {item.endTime ? new Date(item.endTime).toLocaleString() : '—'}</div>
                                 <div style={{ marginTop: 6, fontSize: '0.9rem' }}><strong>From:</strong> {item.originStation?.name || item.originStation?.id || 'Unknown'} <span style={{ marginLeft: 12 }}><strong>To:</strong> {item.arrivalStation?.name || item.arrivalStation?.id || 'Unknown'}</span></div>
+                                
+                                {/* Flex Dollars Applied Display (DM-03, DM-04) */}
+                                {item.flexDollarsApplied > 0 && (
+                                    <div style={{ marginTop: 10, padding: 10, backgroundColor: '#e8f4f8', borderRadius: 6, fontSize: '0.9rem', border: '1px solid #81d4fa' }}>
+                                        <div style={{ color: '#01579b', fontWeight: '600' }}>💰 Flex Dollars Applied: ${item.flexDollarsApplied.toFixed(2)}</div>
+                                        <div style={{ color: '#0277bd', fontSize: '0.85rem', marginTop: 4 }}>
+                                            Original: ${item.totalCost?.toFixed(2) || '0.00'} → You paid: ${item.amountDueAfterFlex?.toFixed(2) || '0.00'}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div style={{ textAlign: 'right' }}>
+                            <div style={{ textAlign: 'right', marginLeft: 12 }}>
                                 <div style={{ fontSize: '1.1rem', fontWeight: '800' }}>${item.totalCost != null ? Number(item.totalCost).toFixed(2) : '—'}</div>
+                                {item.flexDollarsApplied > 0 && (
+                                    <div style={{ fontSize: '0.85rem', color: '#17a2b8', marginTop: 4, fontWeight: '600' }}>
+                                        Saved: ${item.flexDollarsApplied.toFixed(2)}
+                                    </div>
+                                )}
                                 <div style={{ marginTop: 8 }}>
                                     <button onClick={() => navigate('/payment', { state: { selectedPlan: { title: `Rental ${item.rentalId}`, price: `$${Number(item.totalCost || 0).toFixed(2)}`, amount: Number(item.totalCost || 0) } } })} disabled={!(item.totalCost > 0)} style={{ padding: '8px 10px', borderRadius: 8, backgroundColor: '#007bff', color: 'white', border: 'none' }}>
                                         Pay
@@ -482,6 +497,233 @@ const Billing = ({ userId }) => {
     );
 };
 
+// Account Information Component
+const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance, selectedRole, onRoleChange }) => {
+    // Loyalty tier info
+    const loyaltyTiers = {
+        'Entry': { icon: '', color: '#6c757d', perks: 'No perks' },
+        'Bronze': { icon: '', color: '#CD7F32', perks: '$2 discount on every 5th ride' },
+        'Silver': { icon: '', color: '#C0C0C0', perks: '10% discount on all rides' },
+        'Gold': { icon: '', color: '#FFD700', perks: '15% discount + Priority support' },
+        'Platinum': { icon: '', color: '#00D4FF', perks: '20% discount + Free reservations' }
+    };
+
+    const currentTier = loyaltyTiers[loyaltyTier] || loyaltyTiers['Entry'];
+    const isDualRole = userRole === 'operator' || userRole === 'dual';
+
+    const tierBadgeStyle = {
+        display: 'inline-block',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        backgroundColor: currentTier.color,
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: '18px',
+        marginRight: '15px',
+        marginBottom: '15px',
+        textAlign: 'center',
+        minWidth: '150px'
+    };
+
+    const infoBoxStyle = {
+        padding: '20px',
+        backgroundColor: '#f8f9fa',
+        border: '1px solid #dee2e6',
+        borderRadius: '8px',
+        marginBottom: '20px'
+    };
+
+    const labelStyle = {
+        fontWeight: 'bold',
+        color: '#333',
+        marginBottom: '8px',
+        display: 'block'
+    };
+
+    const valueStyle = {
+        fontSize: '16px',
+        color: '#666',
+        marginBottom: '15px'
+    };
+
+    return (
+        <div>
+            {/* Loyalty Program Section */}
+            <div style={infoBoxStyle}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px' }}> Loyalty Program</h3>
+                <div style={tierBadgeStyle}>
+                    {currentTier.icon} {loyaltyTier}
+                </div>
+                <div style={valueStyle}>
+                    <strong>Perks:</strong> {currentTier.perks}
+                </div>
+                <div style={{ fontSize: '14px', color: '#666', fontStyle: 'italic' }}>
+                    Complete more rides to unlock higher tiers and earn exclusive benefits!
+                </div>
+            </div>
+
+            {/* Flex Dollars Section */}
+            <div style={infoBoxStyle}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px' }}> Flex Dollars</h3>
+                <div style={{
+                    fontSize: '32px',
+                    fontWeight: 'bold',
+                    color: '#28a745',
+                    marginBottom: '10px'
+                }}>
+                    ${flexDollarsBalance.toFixed(2)}
+                </div>
+                <div style={valueStyle}>
+                    Earn flex dollars by returning bikes to stations below 25% capacity. 
+                    They're automatically applied to your trips and never expire!
+                </div>
+            </div>
+
+            {/* Role Toggle Section (if dual role) */}
+            {isDualRole && (
+                <div style={infoBoxStyle}>
+                    <h3 style={{ marginTop: 0, marginBottom: '15px' }}> Account Role</h3>
+                    <div style={labelStyle}>Currently Viewing As:</div>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                        <select 
+                            value={selectedRole}
+                            onChange={(e) => onRoleChange(e.target.value)}
+                            style={{
+                                padding: '10px 15px',
+                                borderRadius: '6px',
+                                border: '2px solid #007bff',
+                                fontSize: '16px',
+                                backgroundColor: 'white',
+                                cursor: 'pointer'
+                            }}
+                        >
+                            <option value="rider"> Rider</option>
+                            <option value="operator"> Operator</option>
+                        </select>
+                        <span style={{ color: '#666', fontSize: '14px' }}>
+                            {selectedRole === 'rider' 
+                                ? 'You can rent bikes, view ride history, and earn flex dollars.' 
+                                : 'You can manage bikes, perform maintenance, and rebalance the network.'}
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* Account Details Section */}
+            <div style={infoBoxStyle}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px' }}> Account Details</h3>
+                <div style={valueStyle}>
+                    <strong>Account Type:</strong> {userRole === 'rider' ? ' Rider' : userRole === 'operator' ? ' Operator' : ' ' + userRole}
+                </div>
+                <div style={valueStyle}>
+                    <strong>User ID:</strong> {userId}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Flex Dollars History Component (DM-03, DM-04)
+const FlexDollarsHistory = ({ userId, userRole }) => {
+    const [transactions, setTransactions] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const fetchTransactionHistory = useCallback(async () => {
+        if (!userId) return;
+
+        try {
+            setLoading(true);
+            setError('');
+
+            const response = await fetch(`http://localhost:5001/api/flex-dollars/history?limit=50&offset=0`, {
+                headers: {
+                    'x-user-id': String(userId),
+                    'x-user-role': String(userRole || localStorage.getItem('userRole') || 'rider'),
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                setTransactions(data.transactions || []);
+            } else {
+                setError('Failed to load flex dollars history');
+            }
+        } catch (err) {
+            console.error('Error fetching flex dollars history:', err);
+            setError('Error loading transaction history');
+        } finally {
+            setLoading(false);
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        fetchTransactionHistory();
+    }, [fetchTransactionHistory]);
+
+    if (loading) return <div>Loading flex dollars history...</div>;
+
+    return (
+        <div style={{ marginTop: '20px' }}>
+            {error && <div style={{ color: '#dc3545', marginBottom: '10px' }}>{error}</div>}
+
+            {transactions.length === 0 ? (
+                <div style={{ color: '#6c757d', fontStyle: 'italic', textAlign: 'center', padding: '20px' }}>
+                    No flex dollars transactions yet. Start earning by returning bikes to understocked stations!
+                </div>
+            ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+                    <thead>
+                        <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Date</th>
+                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Type</th>
+                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Description</th>
+                            <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600' }}>Amount</th>
+                            <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600' }}>Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {transactions.map((transaction, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #dee2e6', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8f9fa' }}>
+                                <td style={{ padding: '12px' }}>
+                                    {new Date(transaction.createdAt).toLocaleDateString()} {new Date(transaction.createdAt).toLocaleTimeString()}
+                                </td>
+                                <td style={{ padding: '12px' }}>
+                                    <span style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                        fontWeight: 'bold',
+                                        backgroundColor: transaction.type === 'award' ? '#d4edda' : 
+                                                       transaction.type === 'deduct' ? '#f8d7da' : '#e2e3e5',
+                                        color: transaction.type === 'award' ? '#155724' : 
+                                               transaction.type === 'deduct' ? '#721c24' : '#383d41'
+                                    }}>
+                                        {transaction.type === 'award' ? '✓ Award' :
+                                         transaction.type === 'deduct' ? '✗ Used' : 'Refund'}
+                                    </span>
+                                </td>
+                                <td style={{ padding: '12px' }}>{transaction.description}</td>
+                                <td style={{ 
+                                    padding: '12px', 
+                                    textAlign: 'right', 
+                                    fontWeight: 'bold',
+                                    color: transaction.amount >= 0 ? '#28a745' : '#dc3545'
+                                }}>
+                                    {transaction.amount >= 0 ? '+' : ''} ${Math.abs(transaction.amount).toFixed(2)}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600' }}>
+                                    ${transaction.balanceAfter.toFixed(2)}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </div>
+    );
+};
 
 
 const Profile = () => {
@@ -489,6 +731,28 @@ const Profile = () => {
     const [stationNotifications, setStationNotifications] = useState([]);
     const [notifLoading, setNotifLoading] = useState(false);
     const [notifError, setNotifError] = useState('');
+
+    // Flex Dollars state
+    const [flexDollarsBalance, setFlexDollarsBalance] = useState(0);
+
+    // Fetch flex dollars balance
+    const fetchFlexDollarsBalance = async (userId) => {
+        try {
+            const response = await fetch('http://localhost:5001/api/flex-dollars/balance', {
+                headers: {
+                    'x-user-id': String(userId),
+                    'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setFlexDollarsBalance(data.balance);
+            }
+        } catch (err) {
+            console.error('Error fetching flex dollars balance:', err);
+        }
+    };
 
     // Fetch station notifications
     const fetchStationNotifications = async () => {
@@ -515,8 +779,12 @@ const Profile = () => {
     // Check if this is an existing user without profile information
     const hasIncompleteProfile = !user?.firstName || !user?.lastName || !user?.email;
 
+    // Loyalty Tier state
+    const [loyaltyTier, setLoyaltyTier] = useState('Entry');
+    const [selectedRole, setSelectedRole] = useState(user?.role || 'rider');
+
     // Declare currentView before any useEffect that uses it
-    const [currentView, setCurrentView] = useState(hasIncompleteProfile ? 'edit' : 'profile'); // profile, edit, history, notifications
+    const [currentView, setCurrentView] = useState(hasIncompleteProfile ? 'edit' : 'profile'); // profile, edit, history, notifications, account
     const [isEditing, setIsEditing] = useState(hasIncompleteProfile);
     const [formData, setFormData] = useState({
         firstName: user?.firstName || '',
@@ -533,6 +801,13 @@ const Profile = () => {
             fetchStationNotifications();
         }
     }, [currentView]);
+
+    // Fetch flex dollars balance when profile is loaded
+    useEffect(() => {
+        if (user?.id) {
+            fetchFlexDollarsBalance(user.id);
+        }
+    }, [user?.id]);
 
     // Initialize view based on profile completeness
     useEffect(() => {
@@ -847,6 +1122,13 @@ const Profile = () => {
                 </button>
                 
                 <button
+                    onClick={() => setCurrentView('account')}
+                    style={currentView === 'account' ? activeSidebarButtonStyle : {...sidebarButtonStyle, background: 'linear-gradient(135deg, #FF6B35 0%, #D84315 100%)'}}
+                >
+                    Account Information
+                </button>
+                
+                <button
                     onClick={() => setCurrentView('history')}
                     style={currentView === 'history' ? activeSidebarButtonStyle : {...sidebarButtonStyle, background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)'}}
                 >
@@ -928,6 +1210,80 @@ const Profile = () => {
                                     {user.role}
                                 </div>
                             </div>
+                            
+                            {/* Flex Dollars Balance Section */}
+                            <div style={{
+                                marginTop: '30px',
+                                padding: '20px',
+                                backgroundColor: '#e8f4f8',
+                                border: '2px solid #17a2b8',
+                                borderRadius: '8px'
+                            }}>
+                                <h3 style={{color: '#0c5460', marginBottom: '15px'}}>💰 Flex Dollars Balance</h3>
+                                <div style={{
+                                    fontSize: '24px',
+                                    fontWeight: 'bold',
+                                    color: '#155724',
+                                    marginBottom: '10px'
+                                }}>
+                                    ${flexDollarsBalance.toFixed(2)}
+                                </div>
+                                <p style={{color: '#666', fontSize: '14px', marginBottom: '10px'}}>
+                                    Earn flex dollars by returning bikes to stations below 25% capacity. 
+                                    They're automatically applied to your next trip or reservation!
+                                </p>
+                                <button
+                                    onClick={() => setCurrentView('flex-dollars-history')}
+                                    style={{
+                                        padding: '10px 20px',
+                                        backgroundColor: '#17a2b8',
+                                        color: 'white',
+                                        border: 'none',
+                                        borderRadius: '4px',
+                                        cursor: 'pointer',
+                                        fontSize: '14px'
+                                    }}
+                                >
+                                    View History
+                                </button>
+                            </div>
+                        </>
+                    )}
+
+                    {/* Flex Dollars History View */}
+                    {currentView === 'flex-dollars-history' && (
+                        <>
+                            <h2 style={titleStyle}>Flex Dollars History</h2>
+                            <FlexDollarsHistory userId={user?.id} userRole={user?.role} />
+                            <button
+                                onClick={() => setCurrentView('profile')}
+                                style={{
+                                    marginTop: '20px',
+                                    padding: '10px 20px',
+                                    backgroundColor: '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Back to Profile
+                            </button>
+                        </>
+                    )}
+
+                    {/* Account Information View */}
+                    {currentView === 'account' && (
+                        <>
+                            <h2 style={titleStyle}>Account Information</h2>
+                            <AccountInformation 
+                                userId={user?.id} 
+                                userRole={user?.role}
+                                loyaltyTier={loyaltyTier}
+                                flexDollarsBalance={flexDollarsBalance}
+                                selectedRole={selectedRole}
+                                onRoleChange={setSelectedRole}
+                            />
                         </>
                     )}
 
