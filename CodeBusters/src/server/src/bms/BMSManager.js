@@ -90,7 +90,8 @@ class BMSManager {
             };
         }
 
-        const station = new Station(stationId, capacity, location);
+        const options = location ? (typeof location === 'object' ? location : {}) : {};
+        const station = new Station(stationId, capacity, options);
         this.stations.set(stationId, station);
 
         return {
@@ -265,7 +266,7 @@ class BMSManager {
             this.activeRentals.delete(userId);
         } else {
             this.systemStats.failedDocks++;
-            if (dockResult.operation === BMS_OPERATIONS.DOCK_FAILED_FULL) {
+            if (dockResult.operation === BMS_OPERATIONS.RETURN_FAILED_STATION_FULL) {
                 this.systemStats.blockedOperations++;
             }
         }
