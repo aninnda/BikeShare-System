@@ -452,13 +452,20 @@ const Billing = ({ userId }) => {
     // We'll apply up to the available flex dollars against the total outstanding
     const totalFlexApplied = Math.min(availableFlex, totalCost);
     const totalAmountDueAfterFlex = Math.max(0, totalCost - totalFlexApplied);
+    // Dual users receive a 20% discount on the payment amount (applies after flex)
+    const isDual = user?.role === 'dual';
+    const dualDiscountRate = isDual ? 0.20 : 0;
+    const dualDiscountAmount = isDual ? +(totalAmountDueAfterFlex * dualDiscountRate) : 0;
+    const finalAmountDue = Math.max(0, +(totalAmountDueAfterFlex - dualDiscountAmount));
     
     const handlePayTotal = () => {
         const selectedPlan = { 
             title: 'Outstanding Charges', 
-            price: `$${totalAmountDueAfterFlex.toFixed(2)}`, 
-            amount: totalAmountDueAfterFlex,
+            price: `$${finalAmountDue.toFixed(2)}`, 
+            amount: finalAmountDue,
             originalAmount: totalCost,
+            flexApplied: totalFlexApplied,
+            dualDiscount: dualDiscountAmount
         };
         navigate('/payment', { state: { selectedPlan } });
     };
@@ -491,6 +498,20 @@ const Billing = ({ userId }) => {
                 <div style={{ marginBottom: 10 }}>
                     <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Amount After Flex</div>
                     <div style={{ fontSize: '1.6rem', fontWeight: 900, color: totalAmountDueAfterFlex > 0 ? '#d9534f' : '#198754', marginTop: 6 }}>${totalAmountDueAfterFlex.toFixed(2)}</div>
+                </div>
+
+                {isDual && (
+                    <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Dual Discount (20%)</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#198754', marginTop: 4 }}>
+                            - ${dualDiscountAmount.toFixed(2)}
+                        </div>
+                    </div>
+                )}
+
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Final Amount Due</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: finalAmountDue > 0 ? '#d9534f' : '#198754', marginTop: 6 }}>${finalAmountDue.toFixed(2)}</div>
                 </div>
 
                 <div style={{ marginTop: 6 }}>
@@ -568,11 +589,12 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
     const currentTier = loyaltyTiers[loyaltyTier] || loyaltyTiers['Entry'];
     const isDualRole = userRole === 'operator' || userRole === 'dual';
 
+    const badgeColor = loyaltyTier === 'Entry' ? '#6c757d' : '#17a2b8';
     const tierBadgeStyle = {
         display: 'inline-block',
         padding: '12px 20px',
         borderRadius: '8px',
-        backgroundColor: currentTier.color,
+        backgroundColor: badgeColor,
         color: 'white',
         fontWeight: 'bold',
         fontSize: '18px',
@@ -592,14 +614,14 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
 
     const labelStyle = {
         fontWeight: 'bold',
-        color: '#333',
+        color: '#0c5460',
         marginBottom: '8px',
         display: 'block'
     };
 
     const valueStyle = {
         fontSize: '16px',
-        color: '#666',
+        color: '#0c5460',
         marginBottom: '15px'
     };
 
@@ -607,7 +629,7 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
         <div>
             {/* Loyalty Program Section */}
             <div style={infoBoxStyle}>
-                <h3 style={{ marginTop: 0, marginBottom: '15px' }}> Loyalty Program</h3>
+                        <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Loyalty Program</h3>
                 <div style={tierBadgeStyle}>
                     {currentTier.icon} {loyaltyTier}
                 </div>
@@ -621,7 +643,7 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
 
             {/* Flex Dollars Section  */}
             <div style={infoBoxStyle}>
-                <h3 style={{ marginTop: 0, marginBottom: '15px',color: '#0c5460' }}> Flex Dollars</h3>
+                <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Flex Dollars</h3>
                 <div style={{
                     fontSize: '32px',
                     fontWeight: 'bold',
@@ -639,7 +661,7 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
                         onClick={() => { if (typeof onViewChange === 'function') { onViewChange('flex-dollars-history'); } else { window.location.hash = '#flex-dollars-history'; } }}
                         style={{
                             padding: '10px 20px',
-                            backgroundColor: '#17a2b8',
+                            backgroundColor: loyaltyTier === 'Entry' ? '#6c757d' : '#17a2b8',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
@@ -657,9 +679,9 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
             {/* Role Toggle Section (if dual role) */}
             {isDualRole && (
                 <div style={infoBoxStyle}>
-                    <h3 style={{ marginTop: 0, marginBottom: '15px' }}> Account Role</h3>
+                    <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Account Role</h3>
                     <div style={labelStyle}>Currently Viewing As:</div>
-                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
                         <select 
                             value={selectedRole}
                             onChange={(e) => onRoleChange(e.target.value)}
@@ -675,18 +697,18 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
                             <option value="rider"> Rider</option>
                             <option value="operator"> Operator</option>
                         </select>
-                        <span style={{ color: '#666', fontSize: '14px' }}>
+                        <div style={{ color: '#666', fontSize: '14px', textAlign: 'center', maxWidth: '560px' }}>
                             {selectedRole === 'rider' 
                                 ? 'You can rent bikes, view ride history, and earn flex dollars.' 
                                 : 'You can manage bikes, perform maintenance, and rebalance the network.'}
-                        </span>
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* Account Details Section */}
             <div style={infoBoxStyle}>
-                <h3 style={{ marginTop: 0, marginBottom: '15px' }}> Account Details</h3>
+                <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Account Details</h3>
                 <div style={valueStyle}>
                     <strong>Account Type:</strong> {userRole === 'rider' ? ' Rider' : userRole === 'operator' ? ' Operator' : ' ' + userRole}
                 </div>
@@ -858,6 +880,30 @@ const Profile = () => {
     const [loyaltyTier, setLoyaltyTier] = useState('Entry');
     const [selectedRole, setSelectedRole] = useState(user?.role || 'rider');
 
+    // Handle role changes from AccountInformation — persist for dual users
+    const handleRoleChange = (role) => {
+        setSelectedRole(role);
+        try {
+            localStorage.setItem('dual_view', role);
+        } catch (e) {}
+        window.dispatchEvent(new CustomEvent('dualViewChange', { detail: role }));
+        showRoleChangeMessage(role);
+    };
+
+    // Show a small confirmation message when role/view changes
+    const showRoleChangeMessage = (role) => {
+        try {
+            setMessageType('success');
+            setMessage(`View updated — now viewing as ${role === 'rider' ? 'Rider' : 'Operator'}.`);
+            setTimeout(() => {
+                setMessage('');
+                setMessageType('');
+            }, 3000);
+        } catch (e) {
+            // ignore
+        }
+    };
+
     // Declare currentView before any useEffect that uses it
     const [currentView, setCurrentView] = useState(hasIncompleteProfile ? 'edit' : 'profile'); // profile, edit, history, notifications, account
     const [isEditing, setIsEditing] = useState(hasIncompleteProfile);
@@ -869,6 +915,7 @@ const Profile = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [messageType, setMessageType] = useState('');
 
     // Fetch notifications when notifications view is opened
     useEffect(() => {
@@ -1075,9 +1122,9 @@ const Profile = () => {
         marginBottom: '20px',
         textAlign: 'center',
         fontWeight: '500',
-        backgroundColor: message.includes('success') ? '#d4edda' : '#f8d7da',
-        color: message.includes('success') ? '#155724' : '#721c24',
-        border: `1px solid ${message.includes('success') ? '#c3e6cb' : '#f5c6cb'}`
+        backgroundColor: messageType === 'success' ? '#d4edda' : '#f8d7da',
+        color: messageType === 'success' ? '#155724' : '#721c24',
+        border: `1px solid ${messageType === 'success' ? '#c3e6cb' : '#f5c6cb'}`
     };
 
     const sidebarTitleStyle = {
@@ -1316,13 +1363,18 @@ const Profile = () => {
                     {currentView === 'account' && (
                         <>
                             <h2 style={titleStyle}>Account Information</h2>
+                            {message && (
+                                <div style={messageStyle}>
+                                    {message}
+                                </div>
+                            )}
                             <AccountInformation 
                                 userId={user?.id} 
                                 userRole={user?.role}
                                 loyaltyTier={loyaltyTier}
                                 flexDollarsBalance={flexDollarsBalance}
                                 selectedRole={selectedRole}
-                                onRoleChange={setSelectedRole}
+                                onRoleChange={handleRoleChange}
                                 onViewChange={setCurrentView}
                             />
                         </>

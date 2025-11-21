@@ -36,6 +36,7 @@ const RiderNavbar = ({ user, onLogout }) => (
             <span className="rider-username">
                 {user?.username}
             </span>
+            {/* Dual view switching moved to Account Role in Profile */}
             <button 
                 onClick={onLogout}
                 className="rider-logout-button"

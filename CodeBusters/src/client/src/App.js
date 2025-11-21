@@ -22,8 +22,9 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+  // Treat 'dual' users as both rider and operator
+  const effectiveRoles = user.role === 'dual' ? ['dual', 'rider', 'operator'] : [user.role];
+  if (allowedRoles.length > 0 && !allowedRoles.some(r => effectiveRoles.includes(r))) {
     return <Navigate to="/" replace />;
   }
   

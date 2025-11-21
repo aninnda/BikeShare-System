@@ -25,6 +25,12 @@ const OperatorNavbar = ({ user, onLogout }) => (
             <NavLink to="/operator/analytics">
                 Analytics
             </NavLink>
+                {user && user.role === 'dual' && (
+                    <NavLink to="/profile">
+                        Profile
+                    </NavLink>
+                )}
+                {/* Dual view switching moved to Account Role in Profile */}
             <NavLink to="/plans">
                 Plans
             </NavLink>
