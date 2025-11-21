@@ -398,6 +398,24 @@ const Billing = ({ userId }) => {
     const [billing, setBilling] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [localFlexBalance, setLocalFlexBalance] = useState(null);
+
+    const fetchLocalFlexBalance = useCallback(async () => {
+        if (!user?.id) return;
+        try {
+            const resp = await fetch('http://localhost:5001/api/flex-dollars/balance', {
+                headers: {
+                    'x-user-id': String(user.id),
+                    'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await resp.json();
+            if (data && data.success) setLocalFlexBalance(data.balance || 0);
+        } catch (e) {
+            console.warn('Billing.fetchLocalFlexBalance error:', e);
+        }
+    }, [user?.id, user?.role]);
 
     const fetchBilling = useCallback(async () => {
         if (!userId) return;
@@ -414,6 +432,8 @@ const Billing = ({ userId }) => {
             const data = await resp.json();
             if (data.success) {
                 setBilling(data.billing || []);
+                // Refresh this component's flex dollars balance
+                fetchLocalFlexBalance();
             } else {
                 setError(data.message || 'Failed to load billing history');
             }
@@ -426,15 +446,11 @@ const Billing = ({ userId }) => {
     }, [userId, user]);
 
     useEffect(() => { fetchBilling(); }, [fetchBilling]);
-    // Robust numeric parsing for billing values
+    // Compute totals and apply user's available flex balance (not payments-applied)
     const totalCost = billing.reduce((sum, it) => sum + (Number(it.totalCost) || 0), 0);
-    // Sum only positive flex dollars applied values from items (some rows may have null/undefined)
-    const totalFlexAppliedRaw = billing.reduce((sum, it) => {
-        const v = Number(it.flexDollarsApplied);
-        return sum + (isNaN(v) ? 0 : Math.max(0, v));
-    }, 0);
-    const totalFlexApplied = Number(totalFlexAppliedRaw) || 0;
-    // Ensure amount due never goes below zero
+    const availableFlex = Number(localFlexBalance) || 0; // user's balance fetched locally
+    // We'll apply up to the available flex dollars against the total outstanding
+    const totalFlexApplied = Math.min(availableFlex, totalCost);
     const totalAmountDueAfterFlex = Math.max(0, totalCost - totalFlexApplied);
     
     const handlePayTotal = () => {
@@ -443,18 +459,15 @@ const Billing = ({ userId }) => {
             price: `$${totalAmountDueAfterFlex.toFixed(2)}`, 
             amount: totalAmountDueAfterFlex,
             originalAmount: totalCost,
-            flexDollarsApplied: totalFlexApplied // pass numeric value
         };
         navigate('/payment', { state: { selectedPlan } });
     };
     
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 style={{ margin: 0 }}>Billing</h2>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
                 <div>
-                    <button onClick={fetchBilling} disabled={loading} style={{ padding: 8, borderRadius: 8, backgroundColor: '#007bff', color: 'white', border: 'none' }}>
-                        
+                    <button onClick={fetchBilling} disabled={loading} style={{ padding: '8px 12px', borderRadius: 8, backgroundColor: '#007bff', color: 'white', border: 'none' }}>
                         {loading ? 'Refreshing...' : 'Refresh'}
                     </button>
                 </div>
@@ -462,19 +475,27 @@ const Billing = ({ userId }) => {
 
             {error && <div style={{ color: '#dc3545', marginTop: 12 }}>{error}</div>}
 
-            <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8 }}>
-                <strong>Total Outstanding:</strong><br/>
-                <span>Flex Dollars Applied: <strong style={{ color: '#0277bd' }}>{totalFlexApplied.toFixed(2)}</strong></span><br/>
-                <span>New Amount After Flex: <strong style={{ color: '#28a745' }}>${totalAmountDueAfterFlex.toFixed(2)}</strong></span>
-                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: totalAmountDueAfterFlex > 0 ? '#d9534f' : '#28a745' }}>${totalAmountDueAfterFlex.toFixed(2)}</div>
-                {totalFlexApplied > 0 && (
-                    <div style={{ fontSize: '0.9rem', color: '#0277bd', marginTop: 4 }}>
-                         Flex savings: ${totalFlexApplied.toFixed(2)} (Original: ${totalCost.toFixed(2)})
+            <div style={{ marginTop: 16 }}>
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Original Outstanding</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#343a40', marginTop: 4 }}>${totalCost.toFixed(2)}</div>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Flex Dollars</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0d6efd', marginTop: 4 }}>
+                        {availableFlex > 0 ? `- $${availableFlex.toFixed(2)}` : '$0.00'}
                     </div>
-                )}
-                <div style={{ marginTop: 8 }}>
-                    <button onClick={handlePayTotal} disabled={totalAmountDueAfterFlex <= 0} style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: '#28a745', color: 'white', border: 'none' }}>
-                        {totalAmountDueAfterFlex <= 0 ? '✓ Fully Paid with Flex' : 'Pay Total'}
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Amount After Flex</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: totalAmountDueAfterFlex > 0 ? '#d9534f' : '#198754', marginTop: 6 }}>${totalAmountDueAfterFlex.toFixed(2)}</div>
+                </div>
+
+                <div style={{ marginTop: 6 }}>
+                    <button onClick={handlePayTotal} disabled={totalAmountDueAfterFlex <= 0} style={{ padding: '10px 16px', borderRadius: 8, backgroundColor: '#198754', color: 'white', border: 'none' }}>
+                        {totalAmountDueAfterFlex <= 0 ? '✓ Fully Covered' : 'Pay Total'}
                     </button>
                 </div>
             </div>
@@ -488,23 +509,11 @@ const Billing = ({ userId }) => {
                                 <div style={{ color: '#6c757d', fontSize: '0.9rem' }}>{new Date(item.startTime).toLocaleString()} → {item.endTime ? new Date(item.endTime).toLocaleString() : '—'}</div>
                                 <div style={{ marginTop: 6, fontSize: '0.9rem' }}><strong>From:</strong> {item.originStation?.name || item.originStation?.id || 'Unknown'} <span style={{ marginLeft: 12 }}><strong>To:</strong> {item.arrivalStation?.name || item.arrivalStation?.id || 'Unknown'}</span></div>
                                 
-                                {/* Flex Dollars Applied Display (DM-03, DM-04) */}
-                                {(Number(item.flexDollarsApplied) || 0) > 0 && (
-                                    <div style={{ marginTop: 10, padding: 10, backgroundColor: '#e8f4f8', borderRadius: 6, fontSize: '0.9rem', border: '1px solid #81d4fa' }}>
-                                        <div style={{ color: '#01579b', fontWeight: '600' }}> Flex Dollars Applied: ${Math.abs(Number(item.flexDollarsApplied) || 0).toFixed(2)}</div>
-                                        <div style={{ color: '#0277bd', fontSize: '0.85rem', marginTop: 4 }}>
-                                            Original: ${Number(item.totalCost || 0).toFixed(2)} → You paid: ${Number(item.amountDueAfterFlex || Math.max(0, Number(item.totalCost || 0) - (Number(item.flexDollarsApplied) || 0))).toFixed(2)}
-                                        </div>
-                                    </div>
-                                )}
+                                {/* (Flex Dollars Applied display removed per request) */}
                             </div>
                             <div style={{ textAlign: 'right', marginLeft: 12 }}>
                                 <div style={{ fontSize: '1.1rem', fontWeight: '800' }}>${item.totalCost != null ? Number(item.totalCost).toFixed(2) : '—'}</div>
-                                {(Number(item.flexDollarsApplied) || 0) > 0 && (
-                                    <div style={{ fontSize: '0.85rem', color: '#17a2b8', marginTop: 4, fontWeight: '600' }}>
-                                        Saved: ${Math.abs(Number(item.flexDollarsApplied) || 0).toFixed(2)}
-                                    </div>
-                                )}
+                                {/* per-item saved display removed */}
                                 <div style={{ marginTop: 8 }}>
                                     {(() => {
                                         const amountDue = item.amountDueAfterFlex != null ? Number(item.amountDueAfterFlex) : Math.max(0, Number(item.totalCost || 0) - (Number(item.flexDollarsApplied) || 0));
@@ -517,7 +526,6 @@ const Billing = ({ userId }) => {
                                                             price: `$${amountDue.toFixed(2)}`, 
                                                             amount: amountDue,
                                                             originalAmount: Number(item.totalCost) || 0,
-                                                            flexDollarsApplied: Number(item.flexDollarsApplied) || 0,
                                                             rentalId: item.rentalId
                                                         } 
                                                     } 
