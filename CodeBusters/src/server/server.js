@@ -773,7 +773,8 @@ function setupRoutes() {
                             const flexDollarsApplied = flexResult.amountDeducted;
                             const amountDueAfterFlex = flexResult.remainingBalance;
 
-                            console.log(`Flex dollars applied: $${flexDollarsApplied.toFixed(2)} towards rental #${rentalId}. Remaining to pay: $${amountDueAfterFlex.toFixed(2)}`);
+                            console.log(`[PaymentRoute] flexResult for rental=${rentalId}:`, flexResult);
+                            console.log(`[PaymentRoute] computed flexDollarsApplied=${Number(flexDollarsApplied).toFixed(2)} amountDueAfterFlex=${Number(amountDueAfterFlex).toFixed(2)} totalCost=${totalCost.toFixed(2)}`);
 
                             // Simulate external payment gateway call for remaining balance only
                             const payment = {
@@ -786,6 +787,8 @@ function setupRoutes() {
                                 status: 'paid',
                                 created_at: new Date().toISOString()
                             };
+
+                            console.log('[PaymentRoute] payment object before DB insert:', payment);
 
                             db.run('INSERT INTO payments (rental_id, user_id, amount, flex_dollars_applied, amount_due_after_flex, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                                 [payment.rental_id, payment.user_id, payment.amount, payment.flex_dollars_applied, payment.amount_due_after_flex, payment.method, payment.status, payment.created_at], 

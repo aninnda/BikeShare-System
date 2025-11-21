@@ -98,9 +98,13 @@ class FlexDollarsService {
                         return reject(new Error(`User ${userId} not found`));
                     }
 
-                    const currentBalance = row.flex_dollars || 0;
-                    const deductionAmount = Math.min(currentBalance, amount);
-                    const newBalance = Math.max(0, currentBalance - amount);
+                    const currentBalance = Number(row.flex_dollars) || 0;
+                    const requestedAmount = Number(amount) || 0;
+                    const deductionAmount = Math.min(currentBalance, requestedAmount);
+                    const newBalance = Math.max(0, currentBalance - deductionAmount);
+
+                    // Debug logging to help trace why deduction may be zero
+                    console.log(`[FlexDollarsService] deductFlexDollars called for user=${userId} requestedAmount=${requestedAmount.toFixed(2)} currentBalance=${currentBalance.toFixed(2)} deductionAmount=${deductionAmount.toFixed(2)} newBalance=${newBalance.toFixed(2)}`);
 
                     // Update user balance
                     this.db.run(
@@ -124,15 +128,15 @@ class FlexDollarsService {
                                         return reject(err);
                                     }
 
-                                    const remainingBalance = amount - deductionAmount;
+                                    const remainingBalance = Math.max(0, requestedAmount - deductionAmount);
 
-                                    console.log(`Flex dollars deducted: User ${userId} used $${deductionAmount.toFixed(2)} for ${description}`);
+                                    console.log(`[FlexDollarsService] deduction recorded user=${userId} amountDeducted=${deductionAmount.toFixed(2)} remainingBalance=${remainingBalance.toFixed(2)} balanceAfter=${newBalance.toFixed(2)} description="${description}" relatedRentalId=${relatedRentalId}`);
                                     resolve({
                                         success: true,
                                         userId,
-                                        amountRequested: amount,
+                                        amountRequested: requestedAmount,
                                         amountDeducted: deductionAmount,
-                                        remainingBalance: remainingBalance > 0 ? remainingBalance : 0,
+                                        remainingBalance: remainingBalance,
                                         newBalance,
                                         description
                                     });

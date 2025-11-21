@@ -426,20 +426,35 @@ const Billing = ({ userId }) => {
     }, [userId, user]);
 
     useEffect(() => { fetchBilling(); }, [fetchBilling]);
-
+    // Robust numeric parsing for billing values
     const totalCost = billing.reduce((sum, it) => sum + (Number(it.totalCost) || 0), 0);
-
+    // Sum only positive flex dollars applied values from items (some rows may have null/undefined)
+    const totalFlexAppliedRaw = billing.reduce((sum, it) => {
+        const v = Number(it.flexDollarsApplied);
+        return sum + (isNaN(v) ? 0 : Math.max(0, v));
+    }, 0);
+    const totalFlexApplied = Number(totalFlexAppliedRaw) || 0;
+    // Ensure amount due never goes below zero
+    const totalAmountDueAfterFlex = Math.max(0, totalCost - totalFlexApplied);
+    
     const handlePayTotal = () => {
-        const selectedPlan = { title: 'Outstanding Charges', price: `$${totalCost.toFixed(2)}`, amount: totalCost };
+        const selectedPlan = { 
+            title: 'Outstanding Charges', 
+            price: `$${totalAmountDueAfterFlex.toFixed(2)}`, 
+            amount: totalAmountDueAfterFlex,
+            originalAmount: totalCost,
+            flexDollarsApplied: totalFlexApplied // pass numeric value
+        };
         navigate('/payment', { state: { selectedPlan } });
     };
-
+    
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h2 style={{ margin: 0 }}>Billing</h2>
                 <div>
                     <button onClick={fetchBilling} disabled={loading} style={{ padding: 8, borderRadius: 8, backgroundColor: '#007bff', color: 'white', border: 'none' }}>
+                        
                         {loading ? 'Refreshing...' : 'Refresh'}
                     </button>
                 </div>
@@ -448,11 +463,18 @@ const Billing = ({ userId }) => {
             {error && <div style={{ color: '#dc3545', marginTop: 12 }}>{error}</div>}
 
             <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8 }}>
-                <strong>Total Outstanding:</strong>
-                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: totalCost > 0 ? '#d9534f' : '#28a745' }}>${totalCost.toFixed(2)}</div>
+                <strong>Total Outstanding:</strong><br/>
+                <span>Flex Dollars Applied: <strong style={{ color: '#0277bd' }}>{totalFlexApplied.toFixed(2)}</strong></span><br/>
+                <span>New Amount After Flex: <strong style={{ color: '#28a745' }}>${totalAmountDueAfterFlex.toFixed(2)}</strong></span>
+                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: totalAmountDueAfterFlex > 0 ? '#d9534f' : '#28a745' }}>${totalAmountDueAfterFlex.toFixed(2)}</div>
+                {totalFlexApplied > 0 && (
+                    <div style={{ fontSize: '0.9rem', color: '#0277bd', marginTop: 4 }}>
+                         Flex savings: ${totalFlexApplied.toFixed(2)} (Original: ${totalCost.toFixed(2)})
+                    </div>
+                )}
                 <div style={{ marginTop: 8 }}>
-                    <button onClick={handlePayTotal} disabled={totalCost <= 0} style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: '#28a745', color: 'white', border: 'none' }}>
-                        Pay Total
+                    <button onClick={handlePayTotal} disabled={totalAmountDueAfterFlex <= 0} style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: '#28a745', color: 'white', border: 'none' }}>
+                        {totalAmountDueAfterFlex <= 0 ? '✓ Fully Paid with Flex' : 'Pay Total'}
                     </button>
                 </div>
             </div>
@@ -467,26 +489,53 @@ const Billing = ({ userId }) => {
                                 <div style={{ marginTop: 6, fontSize: '0.9rem' }}><strong>From:</strong> {item.originStation?.name || item.originStation?.id || 'Unknown'} <span style={{ marginLeft: 12 }}><strong>To:</strong> {item.arrivalStation?.name || item.arrivalStation?.id || 'Unknown'}</span></div>
                                 
                                 {/* Flex Dollars Applied Display (DM-03, DM-04) */}
-                                {item.flexDollarsApplied > 0 && (
+                                {(Number(item.flexDollarsApplied) || 0) > 0 && (
                                     <div style={{ marginTop: 10, padding: 10, backgroundColor: '#e8f4f8', borderRadius: 6, fontSize: '0.9rem', border: '1px solid #81d4fa' }}>
-                                        <div style={{ color: '#01579b', fontWeight: '600' }}>💰 Flex Dollars Applied: ${item.flexDollarsApplied.toFixed(2)}</div>
+                                        <div style={{ color: '#01579b', fontWeight: '600' }}> Flex Dollars Applied: ${Math.abs(Number(item.flexDollarsApplied) || 0).toFixed(2)}</div>
                                         <div style={{ color: '#0277bd', fontSize: '0.85rem', marginTop: 4 }}>
-                                            Original: ${item.totalCost?.toFixed(2) || '0.00'} → You paid: ${item.amountDueAfterFlex?.toFixed(2) || '0.00'}
+                                            Original: ${Number(item.totalCost || 0).toFixed(2)} → You paid: ${Number(item.amountDueAfterFlex || Math.max(0, Number(item.totalCost || 0) - (Number(item.flexDollarsApplied) || 0))).toFixed(2)}
                                         </div>
                                     </div>
                                 )}
                             </div>
                             <div style={{ textAlign: 'right', marginLeft: 12 }}>
                                 <div style={{ fontSize: '1.1rem', fontWeight: '800' }}>${item.totalCost != null ? Number(item.totalCost).toFixed(2) : '—'}</div>
-                                {item.flexDollarsApplied > 0 && (
+                                {(Number(item.flexDollarsApplied) || 0) > 0 && (
                                     <div style={{ fontSize: '0.85rem', color: '#17a2b8', marginTop: 4, fontWeight: '600' }}>
-                                        Saved: ${item.flexDollarsApplied.toFixed(2)}
+                                        Saved: ${Math.abs(Number(item.flexDollarsApplied) || 0).toFixed(2)}
                                     </div>
                                 )}
                                 <div style={{ marginTop: 8 }}>
-                                    <button onClick={() => navigate('/payment', { state: { selectedPlan: { title: `Rental ${item.rentalId}`, price: `$${Number(item.totalCost || 0).toFixed(2)}`, amount: Number(item.totalCost || 0) } } })} disabled={!(item.totalCost > 0)} style={{ padding: '8px 10px', borderRadius: 8, backgroundColor: '#007bff', color: 'white', border: 'none' }}>
-                                        Pay
-                                    </button>
+                                    {(() => {
+                                        const amountDue = item.amountDueAfterFlex != null ? Number(item.amountDueAfterFlex) : Math.max(0, Number(item.totalCost || 0) - (Number(item.flexDollarsApplied) || 0));
+                                        return (
+                                            <button 
+                                                onClick={() => navigate('/payment', { 
+                                                    state: { 
+                                                        selectedPlan: { 
+                                                            title: `Rental ${item.rentalId}`, 
+                                                            price: `$${amountDue.toFixed(2)}`, 
+                                                            amount: amountDue,
+                                                            originalAmount: Number(item.totalCost) || 0,
+                                                            flexDollarsApplied: Number(item.flexDollarsApplied) || 0,
+                                                            rentalId: item.rentalId
+                                                        } 
+                                                    } 
+                                                })} 
+                                                disabled={!(item.totalCost > 0)} 
+                                                style={{ 
+                                                    padding: '8px 10px', 
+                                                    borderRadius: 8, 
+                                                    backgroundColor: amountDue <= 0 ? '#6c757d' : '#007bff', 
+                                                    color: 'white', 
+                                                    border: 'none',
+                                                    cursor: amountDue <= 0 ? 'not-allowed' : 'pointer'
+                                                }}
+                                            >
+                                                {amountDue <= 0 ? '✓ Paid' : `Pay $${amountDue.toFixed(2)}`}
+                                            </button>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -498,7 +547,7 @@ const Billing = ({ userId }) => {
 };
 
 // Account Information Component
-const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance, selectedRole, onRoleChange }) => {
+const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance, selectedRole, onRoleChange, onViewChange }) => {
     // Loyalty tier info
     const loyaltyTiers = {
         'Entry': { icon: '', color: '#6c757d', perks: 'No perks' },
@@ -527,8 +576,8 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
 
     const infoBoxStyle = {
         padding: '20px',
-        backgroundColor: '#f8f9fa',
-        border: '1px solid #dee2e6',
+        backgroundColor: '#e8f4f8',
+        border: '2px solid #17a2b8',
         borderRadius: '8px',
         marginBottom: '20px'
     };
@@ -562,13 +611,13 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
                 </div>
             </div>
 
-            {/* Flex Dollars Section */}
+            {/* Flex Dollars Section  */}
             <div style={infoBoxStyle}>
-                <h3 style={{ marginTop: 0, marginBottom: '15px' }}> Flex Dollars</h3>
+                <h3 style={{ marginTop: 0, marginBottom: '15px',color: '#0c5460' }}> Flex Dollars</h3>
                 <div style={{
                     fontSize: '32px',
                     fontWeight: 'bold',
-                    color: '#28a745',
+                    color: '#155724',
                     marginBottom: '10px'
                 }}>
                     ${flexDollarsBalance.toFixed(2)}
@@ -577,7 +626,25 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
                     Earn flex dollars by returning bikes to stations below 25% capacity. 
                     They're automatically applied to your trips and never expire!
                 </div>
+                <div style={{ marginTop: '12px' }}>
+                    <button
+                        onClick={() => { if (typeof onViewChange === 'function') { onViewChange('flex-dollars-history'); } else { window.location.hash = '#flex-dollars-history'; } }}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: '#17a2b8',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                        }}
+                    >
+                        View History
+                    </button>
+                </div>
             </div>
+
+
 
             {/* Role Toggle Section (if dual role) */}
             {isDualRole && (
@@ -1211,42 +1278,7 @@ const Profile = () => {
                                 </div>
                             </div>
                             
-                            {/* Flex Dollars Balance Section */}
-                            <div style={{
-                                marginTop: '30px',
-                                padding: '20px',
-                                backgroundColor: '#e8f4f8',
-                                border: '2px solid #17a2b8',
-                                borderRadius: '8px'
-                            }}>
-                                <h3 style={{color: '#0c5460', marginBottom: '15px'}}>💰 Flex Dollars Balance</h3>
-                                <div style={{
-                                    fontSize: '24px',
-                                    fontWeight: 'bold',
-                                    color: '#155724',
-                                    marginBottom: '10px'
-                                }}>
-                                    ${flexDollarsBalance.toFixed(2)}
-                                </div>
-                                <p style={{color: '#666', fontSize: '14px', marginBottom: '10px'}}>
-                                    Earn flex dollars by returning bikes to stations below 25% capacity. 
-                                    They're automatically applied to your next trip or reservation!
-                                </p>
-                                <button
-                                    onClick={() => setCurrentView('flex-dollars-history')}
-                                    style={{
-                                        padding: '10px 20px',
-                                        backgroundColor: '#17a2b8',
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '4px',
-                                        cursor: 'pointer',
-                                        fontSize: '14px'
-                                    }}
-                                >
-                                    View History
-                                </button>
-                            </div>
+    
                         </>
                     )}
 
@@ -1256,7 +1288,7 @@ const Profile = () => {
                             <h2 style={titleStyle}>Flex Dollars History</h2>
                             <FlexDollarsHistory userId={user?.id} userRole={user?.role} />
                             <button
-                                onClick={() => setCurrentView('profile')}
+                                onClick={() => setCurrentView('account')}
                                 style={{
                                     marginTop: '20px',
                                     padding: '10px 20px',
@@ -1267,7 +1299,7 @@ const Profile = () => {
                                     cursor: 'pointer'
                                 }}
                             >
-                                Back to Profile
+                                Back to Account Information
                             </button>
                         </>
                     )}
@@ -1283,6 +1315,7 @@ const Profile = () => {
                                 flexDollarsBalance={flexDollarsBalance}
                                 selectedRole={selectedRole}
                                 onRoleChange={setSelectedRole}
+                                onViewChange={setCurrentView}
                             />
                         </>
                     )}
