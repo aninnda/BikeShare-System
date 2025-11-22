@@ -649,11 +649,12 @@ function setupRoutes() {
                     r.end_station_id AS end_station_id,
                     s2.name AS end_station_name,
                     COALESCE(p.flex_dollars_applied, 0) as flex_dollars_applied,
-                    p.amount_due_after_flex
+                    p.amount_due_after_flex,
+                    p.status as payment_status
                 FROM rentals r
                 LEFT JOIN stations s1 ON r.station_id = s1.id
                 LEFT JOIN stations s2 ON r.end_station_id = s2.id
-                LEFT JOIN payments p ON r.id = p.rental_id
+                LEFT JOIN payments p ON r.id = p.rental_id AND p.status = 'paid'
                 WHERE r.user_id = ? AND r.status = 'completed'
                 ORDER BY r.start_time DESC
                 LIMIT ? OFFSET ?
@@ -666,13 +667,23 @@ function setupRoutes() {
                 // For each rental attempt to compute deterministic breakdown using calculateRentalCost
                 const results = rows.map(row => {
                     // Determine bike type from bike_id pattern
-                    const bikeIdNum = parseInt(row.bike_id.replace('BIKE', ''));
+                    const bikeIdStr = String(row.bike_id || '');
+                    const bikeIdNum = parseInt(bikeIdStr.replace('BIKE', ''));
                     const eBikeIds = [2, 5, 7, 10, 12, 14, 17, 19, 21, 23, 24, 27, 29, 32, 34, 36, 37, 39, 42, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61, 64, 66, 68, 70, 72, 74, 76];
                     const bikeType = eBikeIds.includes(bikeIdNum) ? 'electric' : 'standard';
 
                     const breakdown = row.end_time && row.start_time ? calculateRentalCost(row.start_time, row.end_time, bikeType) : null;
                     const flexDollarsApplied = Number(row.flex_dollars_applied) || 0;
-                    const amountDueAfterFlex = row.amount_due_after_flex;
+                    
+                    // If payment status is 'paid', amount due is 0, otherwise use stored value or calculate
+                    let amountDueAfterFlex;
+                    if (row.payment_status === 'paid') {
+                        amountDueAfterFlex = 0;
+                    } else if (row.amount_due_after_flex !== null && row.amount_due_after_flex !== undefined) {
+                        amountDueAfterFlex = Number(row.amount_due_after_flex);
+                    } else {
+                        amountDueAfterFlex = null;
+                    }
 
                     return {
                         rentalId: row.id,
@@ -688,7 +699,8 @@ function setupRoutes() {
                         totalCost: row.total_cost != null ? Number(row.total_cost) : (breakdown ? breakdown.totalCost : null),
                         breakdown: breakdown,
                         flexDollarsApplied: flexDollarsApplied,
-                        amountDueAfterFlex: amountDueAfterFlex != null ? Number(amountDueAfterFlex) : null
+                        amountDueAfterFlex: amountDueAfterFlex,
+                        paymentStatus: row.payment_status || null
                     };
                 });
 
@@ -1617,7 +1629,8 @@ function setupRoutes() {
 
     // Authentication endpoints (keep existing)
     app.post('/api/register', (req, res) => {
-        const { username, password, firstName, lastName, email, address, role = 'rider' } = req.body;
+        const { username, password, firstName, lastName, email, address, role = 'rider', 
+                cardNumber, expiryDate, cvcCode, cardHolderName } = req.body;
         
         if (!username || !password || !firstName || !lastName || !email) {
             return res.status(400).json({ 
@@ -1633,6 +1646,40 @@ function setupRoutes() {
                 success: false, 
                 message: 'Please enter a valid email address' 
             });
+        }
+        
+        // Validate card information if provided
+        if (cardNumber || expiryDate || cvcCode || cardHolderName) {
+            if (!cardNumber || !expiryDate || !cvcCode || !cardHolderName) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'All card information fields are required' 
+                });
+            }
+            
+            // Validate card number (must be 16 digits)
+            if (cardNumber.length !== 16 || !/^\d+$/.test(cardNumber)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid card number' 
+                });
+            }
+            
+            // Validate expiry date format (MM/YY)
+            if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryDate)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid expiry date format' 
+                });
+            }
+            
+            // Validate CVC (must be 3 digits)
+            if (cvcCode.length !== 3 || !/^\d+$/.test(cvcCode)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid CVC code' 
+                });
+            }
         }
         
         db.run(
@@ -1653,11 +1700,31 @@ function setupRoutes() {
                     });
                 }
                 
+                const userId = this.lastID;
+                
+                // If card information is provided, save it
+                if (cardNumber && expiryDate && cardHolderName) {
+                    // Store only last 4 digits of card number for security
+                    const last4Digits = cardNumber.slice(-4);
+                    
+                    db.run(
+                        'INSERT INTO payment_methods (user_id, card_number_last4, card_holder_name, expiry_date, is_default) VALUES (?, ?, ?, ?, 1)',
+                        [userId, last4Digits, cardHolderName, expiryDate],
+                        function(cardErr) {
+                            if (cardErr) {
+                                console.error('Error saving card information:', cardErr.message);
+                                // Don't fail registration if card save fails
+                                // User can add card later
+                            }
+                        }
+                    );
+                }
+                
                 res.json({
                     success: true,
                     message: 'User registered successfully',
                     user: { 
-                        id: this.lastID, 
+                        id: userId, 
                         username: username, 
                         firstName: firstName,
                         lastName: lastName,
@@ -1666,6 +1733,41 @@ function setupRoutes() {
                         role: role 
                     }
                 });
+            }
+        );
+    });
+
+    // Get payment method for a user
+    app.get('/api/payment-methods/:userId', (req, res) => {
+        const { userId } = req.params;
+        
+        console.log(`[PaymentMethod] Fetching for userId: ${userId} (type: ${typeof userId})`);
+        
+        db.get(
+            'SELECT id, card_number_last4, card_holder_name, expiry_date, is_default, created_at FROM payment_methods WHERE user_id = ? AND is_default = 1',
+            [userId],
+            (err, row) => {
+                if (err) {
+                    console.error('Database error:', err.message);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Internal server error' 
+                    });
+                }
+                
+                console.log(`[PaymentMethod] Found row:`, row);
+                
+                if (row) {
+                    res.json({
+                        success: true,
+                        paymentMethod: row
+                    });
+                } else {
+                    res.json({
+                        success: true,
+                        paymentMethod: null
+                    });
+                }
             }
         );
     });

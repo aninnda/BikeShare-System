@@ -399,6 +399,7 @@ const Billing = ({ userId }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [localFlexBalance, setLocalFlexBalance] = useState(null);
+    const [paymentMethod, setPaymentMethod] = useState(null);
 
     const fetchLocalFlexBalance = useCallback(async () => {
         if (!user?.id) return;
@@ -416,6 +417,23 @@ const Billing = ({ userId }) => {
             console.warn('Billing.fetchLocalFlexBalance error:', e);
         }
     }, [user?.id, user?.role]);
+
+    const fetchPaymentMethod = useCallback(async () => {
+        if (!userId) return;
+        try {
+            const resp = await fetch(`http://localhost:5001/api/payment-methods/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await resp.json();
+            if (data.success && data.paymentMethod) {
+                setPaymentMethod(data.paymentMethod);
+            }
+        } catch (err) {
+            console.error('Error fetching payment method:', err);
+        }
+    }, [userId]);
 
     const fetchBilling = useCallback(async () => {
         if (!userId) return;
@@ -443,11 +461,20 @@ const Billing = ({ userId }) => {
         } finally {
             setLoading(false);
         }
-    }, [userId, user]);
+    }, [userId, user, fetchLocalFlexBalance]);
 
-    useEffect(() => { fetchBilling(); }, [fetchBilling]);
-    // Compute totals and apply user's available flex balance (not payments-applied)
-    const totalCost = billing.reduce((sum, it) => sum + (Number(it.totalCost) || 0), 0);
+    useEffect(() => { 
+        fetchBilling();
+        fetchPaymentMethod();
+    }, [fetchBilling, fetchPaymentMethod]);
+    
+    // Compute totals - only include unpaid rentals
+    const totalCost = billing.reduce((sum, it) => {
+        // If amountDueAfterFlex exists and is 0, the rental is paid
+        const isPaid = it.amountDueAfterFlex !== null && it.amountDueAfterFlex !== undefined && Number(it.amountDueAfterFlex) === 0;
+        return sum + (isPaid ? 0 : (Number(it.totalCost) || 0));
+    }, 0);
+    
     const availableFlex = Number(localFlexBalance) || 0; // user's balance fetched locally
     // We'll apply up to the available flex dollars against the total outstanding
     const totalFlexApplied = Math.min(availableFlex, totalCost);
@@ -459,13 +486,23 @@ const Billing = ({ userId }) => {
     const finalAmountDue = Math.max(0, +(totalAmountDueAfterFlex - dualDiscountAmount));
     
     const handlePayTotal = () => {
+        // Get all unpaid rental IDs
+        const unpaidRentalIds = billing
+            .filter(item => {
+                const isPaid = item.amountDueAfterFlex !== null && item.amountDueAfterFlex !== undefined && Number(item.amountDueAfterFlex) === 0;
+                return !isPaid && Number(item.totalCost || 0) > 0;
+            })
+            .map(item => item.rentalId);
+        
         const selectedPlan = { 
             title: 'Outstanding Charges', 
             price: `$${finalAmountDue.toFixed(2)}`, 
             amount: finalAmountDue,
             originalAmount: totalCost,
             flexApplied: totalFlexApplied,
-            dualDiscount: dualDiscountAmount
+            dualDiscount: dualDiscountAmount,
+            rentalIds: unpaidRentalIds, // Pass array of rental IDs
+            isBatchPayment: true
         };
         navigate('/payment', { state: { selectedPlan } });
     };
@@ -481,6 +518,35 @@ const Billing = ({ userId }) => {
             </div>
 
             {error && <div style={{ color: '#dc3545', marginTop: 12 }}>{error}</div>}
+
+            {/* Payment Method Section */}
+            {paymentMethod && (
+                <div style={{ 
+                    marginTop: 16, 
+                    marginBottom: 20,
+                    padding: '20px', 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                    borderRadius: '12px',
+                    color: 'white',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                }}>
+                    <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', fontWeight: '600' }}> Payment Method</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ fontSize: '2.5rem' }}></div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '1.2rem', fontWeight: '600', letterSpacing: '2px', marginBottom: '6px' }}>
+                                •••• •••• •••• {paymentMethod.card_number_last4}
+                            </div>
+                            <div style={{ fontSize: '0.95rem', opacity: 0.9, marginBottom: '4px', textTransform: 'uppercase' }}>
+                                {paymentMethod.card_holder_name}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                                Expires: {paymentMethod.expiry_date}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div style={{ marginTop: 16 }}>
                 <div style={{ marginBottom: 10 }}>
@@ -537,7 +603,10 @@ const Billing = ({ userId }) => {
                                 {/* per-item saved display removed */}
                                 <div style={{ marginTop: 8 }}>
                                     {(() => {
-                                        const amountDue = item.amountDueAfterFlex != null ? Number(item.amountDueAfterFlex) : Math.max(0, Number(item.totalCost || 0) - (Number(item.flexDollarsApplied) || 0));
+                                        // If payment exists (amountDueAfterFlex is not null), use it; otherwise calculate
+                                        const isPaid = item.amountDueAfterFlex !== null && item.amountDueAfterFlex !== undefined;
+                                        const amountDue = isPaid ? Number(item.amountDueAfterFlex) : Math.max(0, Number(item.totalCost || 0) - (Number(item.flexDollarsApplied) || 0));
+                                        
                                         return (
                                             <button 
                                                 onClick={() => navigate('/payment', { 
@@ -551,11 +620,11 @@ const Billing = ({ userId }) => {
                                                         } 
                                                     } 
                                                 })} 
-                                                disabled={!(item.totalCost > 0)} 
+                                                disabled={amountDue <= 0} 
                                                 style={{ 
                                                     padding: '8px 10px', 
                                                     borderRadius: 8, 
-                                                    backgroundColor: amountDue <= 0 ? '#6c757d' : '#007bff', 
+                                                    backgroundColor: amountDue <= 0 ? '#198754' : '#007bff', 
                                                     color: 'white', 
                                                     border: 'none',
                                                     cursor: amountDue <= 0 ? 'not-allowed' : 'pointer'

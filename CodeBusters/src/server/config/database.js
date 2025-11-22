@@ -134,6 +134,19 @@ class Database {
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users (id),
                     FOREIGN KEY (related_rental_id) REFERENCES rentals (id)
+                )`,
+                
+                // Payment methods table
+                `CREATE TABLE IF NOT EXISTS payment_methods (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    card_number_last4 TEXT NOT NULL,
+                    card_holder_name TEXT NOT NULL,
+                    expiry_date TEXT NOT NULL,
+                    is_default INTEGER DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
                 )`
             ];
 
