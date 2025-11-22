@@ -36,7 +36,30 @@ const RiderNavbar = ({ user, onLogout }) => (
             <span className="rider-username">
                 {user?.username}
             </span>
-            {/* Dual view switching moved to Account Role in Profile */}
+            {user?.role === 'dual' && (
+                <select 
+                    value="rider"
+                    onChange={(e) => {
+                        const newView = e.target.value;
+                        localStorage.setItem('dual_view', newView);
+                        window.dispatchEvent(new CustomEvent('dualViewChange', { detail: newView }));
+                    }}
+                    style={{
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '2px solid #fff',
+                        fontSize: '14px',
+                        backgroundColor: '#922338',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        marginRight: '10px'
+                    }}
+                >
+                    <option value="rider"> Rider View</option>
+                    <option value="operator"> Operator View</option>
+                </select>
+            )}
             <button 
                 onClick={onLogout}
                 className="rider-logout-button"

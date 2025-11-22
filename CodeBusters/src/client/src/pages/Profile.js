@@ -676,31 +676,30 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
 
 
 
-            {/* Role Toggle Section (if dual role) */}
+            {/* Role Display Section (if dual role) */}
             {isDualRole && (
                 <div style={infoBoxStyle}>
                     <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Account Role</h3>
                     <div style={labelStyle}>Currently Viewing As:</div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
-                        <select 
-                            value={selectedRole}
-                            onChange={(e) => onRoleChange(e.target.value)}
-                            style={{
-                                padding: '10px 15px',
-                                borderRadius: '6px',
-                                border: '2px solid #007bff',
-                                fontSize: '16px',
-                                backgroundColor: 'white',
-                                cursor: 'pointer'
-                            }}
-                        >
-                            <option value="rider"> Rider</option>
-                            <option value="operator"> Operator</option>
-                        </select>
+                        <div style={{
+                            padding: '10px 15px',
+                            borderRadius: '6px',
+                            border: '2px solid #007bff',
+                            fontSize: '16px',
+                            backgroundColor: '#e7f3ff',
+                            fontWeight: 'bold',
+                            color: '#007bff'
+                        }}>
+                            {selectedRole === 'rider' ? ' Rider' : ' Operator'}
+                        </div>
                         <div style={{ color: '#666', fontSize: '14px', textAlign: 'center', maxWidth: '560px' }}>
                             {selectedRole === 'rider' 
                                 ? 'You can rent bikes, view ride history, and earn flex dollars.' 
                                 : 'You can manage bikes, perform maintenance, and rebalance the network.'}
+                        </div>
+                        <div style={{ color: '#999', fontSize: '12px', fontStyle: 'italic', textAlign: 'center' }}>
+                            Switch views using the navbar dropdown
                         </div>
                     </div>
                 </div>
@@ -878,7 +877,31 @@ const Profile = () => {
 
     // Loyalty Tier state
     const [loyaltyTier, setLoyaltyTier] = useState('Entry');
-    const [selectedRole, setSelectedRole] = useState(user?.role || 'rider');
+    
+    // Initialize selectedRole from localStorage for dual users
+    const [selectedRole, setSelectedRole] = useState(() => {
+        if (user?.role === 'dual') {
+            try {
+                return localStorage.getItem('dual_view') || 'operator';
+            } catch (e) {
+                return 'operator';
+            }
+        }
+        return user?.role || 'rider';
+    });
+
+    // Listen for view changes from navbar
+    useEffect(() => {
+        if (user?.role === 'dual') {
+            const handler = (e) => {
+                if (e && e.detail) {
+                    setSelectedRole(e.detail);
+                }
+            };
+            window.addEventListener('dualViewChange', handler);
+            return () => window.removeEventListener('dualViewChange', handler);
+        }
+    }, [user?.role]);
 
     // Handle role changes from AccountInformation — persist for dual users
     const handleRoleChange = (role) => {
