@@ -13,6 +13,7 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [tierNotification, setTierNotification] = useState(null);
 
     // Check for stored user data on app load
     useEffect(() => {
@@ -33,16 +34,39 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('user', JSON.stringify(userData));
     };
 
+    const setLoginTierNotification = (notification) => {
+        setTierNotification(notification);
+    };
+
+    const clearTierNotification = () => {
+        setTierNotification(null);
+    };
+
     const logout = () => {
         setUser(null);
         localStorage.removeItem('user');
+    };
+
+    const updateUserLoyaltyTier = (loyaltyTier) => {
+        if (user) {
+            const updatedUser = {
+                ...user,
+                loyaltyTier
+            };
+            setUser(updatedUser);
+            localStorage.setItem('user', JSON.stringify(updatedUser));
+        }
     };
 
     const value = {
         user,
         login,
         logout,
-        isLoading
+        isLoading,
+        updateUserLoyaltyTier,
+        tierNotification,
+        setLoginTierNotification,
+        clearTierNotification
     };
 
     return (

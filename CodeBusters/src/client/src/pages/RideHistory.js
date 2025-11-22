@@ -420,6 +420,12 @@ function RideHistory() {
                                 <h3>Cost Breakdown</h3>
                                 {(() => {
                                     const breakdown = calculateCostBreakdown(selectedRide);
+                                    const actualCost = selectedRide.cost;
+                                    const calculatedCost = breakdown.baseCost + breakdown.timeCharge;
+                                    const hasDiscount = actualCost < calculatedCost;
+                                    const discountAmount = calculatedCost - actualCost;
+                                    const discountPercent = hasDiscount ? Math.round((discountAmount / calculatedCost) * 100) : 0;
+
                                     return (
                                         <div className="cost-breakdown">
                                             <div className="cost-item">
@@ -432,10 +438,16 @@ function RideHistory() {
                                                 </span>
                                                 <span>${breakdown.timeCharge.toFixed(2)}</span>
                                             </div>
+                                            {hasDiscount && (
+                                                <div className="cost-item discount-item">
+                                                    <span>Loyalty Discount ({discountPercent}%):</span>
+                                                    <span className="discount-amount">-${discountAmount.toFixed(2)}</span>
+                                                </div>
+                                            )}
                                             <div className="cost-divider"></div>
                                             <div className="cost-item cost-total">
                                                 <span>Total Cost:</span>
-                                                <span className="total-amount">${selectedRide.cost.toFixed(2)}</span>
+                                                <span className="total-amount">${actualCost.toFixed(2)}</span>
                                             </div>
                                         </div>
                                     );

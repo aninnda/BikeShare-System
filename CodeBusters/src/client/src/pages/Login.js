@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import TierNotification from '../components/TierNotification';
 import './style/Login.css';
 
 const Login = () => {
@@ -10,7 +11,8 @@ const Login = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState('');
-    const { login } = useAuth();
+    const [tierNotification, setTierNotification] = useState(null);
+    const { login, setLoginTierNotification } = useAuth();
     const navigate = useNavigate();
 
     const handleChange = (e) => {
@@ -24,6 +26,7 @@ const Login = () => {
         e.preventDefault();
         setIsLoading(true);
         setMessage('');
+        setTierNotification(null);
 
         try {
             const response = await fetch('http://localhost:5001/api/login', {
@@ -36,15 +39,25 @@ const Login = () => {
 
             const data = await response.json();
 
+            console.log('[Login] Response received:', data);
+            console.log('[Login] Response has tierNotification:', !!data.tierNotification);
+
             if (data.success) {
-                setMessage('Login successful! Redirecting...');
                 // Use the login function from AuthContext
                 login(data.user);
                 
-                // Redirect based on user role
-                setTimeout(() => {
-                    navigate('/');
-                }, 500);
+                // Show tier notification if user's tier changed
+                // Store it in context so it can be displayed on the dashboard
+                if (data.tierNotification) {
+                    console.log('[Login] Setting tier notification in context:', data.tierNotification);
+                    setLoginTierNotification(data.tierNotification);
+                    setTierNotification(data.tierNotification);
+                } else {
+                    console.log('[Login] No tier notification in response');
+                }
+                
+                // App.js routing will automatically redirect to dashboard
+                // No need to manually redirect - just let React Router handle it
             } else {
                 setMessage(data.message || 'Login failed');
             }
@@ -58,6 +71,11 @@ const Login = () => {
 
     return (
         <>
+            <TierNotification 
+                notification={tierNotification}
+                onClose={() => setTierNotification(null)}
+            />
+            
             <div className="login-page">
                 {/* Overlay for better text readability */}
                 <div className="login-overlay"></div>
