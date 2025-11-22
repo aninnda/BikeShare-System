@@ -12,7 +12,7 @@ const Login = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [tierNotification, setTierNotification] = useState(null);
-    const { login } = useAuth();
+    const { login, setLoginTierNotification } = useAuth();
     const navigate = useNavigate();
 
     const handleChange = (e) => {
@@ -39,21 +39,25 @@ const Login = () => {
 
             const data = await response.json();
 
+            console.log('[Login] Response received:', data);
+            console.log('[Login] Response has tierNotification:', !!data.tierNotification);
+
             if (data.success) {
-                setMessage('Login successful! Redirecting...');
-                
-                // Show tier notification if user's tier changed
-                if (data.tierNotification) {
-                    setTierNotification(data.tierNotification);
-                }
-                
                 // Use the login function from AuthContext
                 login(data.user);
                 
-                // Redirect based on user role (with delay to show notification)
-                setTimeout(() => {
-                    navigate('/');
-                }, data.tierNotification ? 2000 : 500);
+                // Show tier notification if user's tier changed
+                // Store it in context so it can be displayed on the dashboard
+                if (data.tierNotification) {
+                    console.log('[Login] Setting tier notification in context:', data.tierNotification);
+                    setLoginTierNotification(data.tierNotification);
+                    setTierNotification(data.tierNotification);
+                } else {
+                    console.log('[Login] No tier notification in response');
+                }
+                
+                // App.js routing will automatically redirect to dashboard
+                // No need to manually redirect - just let React Router handle it
             } else {
                 setMessage(data.message || 'Login failed');
             }

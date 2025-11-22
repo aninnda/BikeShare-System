@@ -1719,8 +1719,12 @@ function setupRoutes() {
                             role: row.role,
                             loyaltyTier: row.loyalty_tier || 'none'
                         },
-                        tierNotification
+                        tierNotification: tierNotification || null
                     });
+                    
+                    if (tierNotification) {
+                        console.log(`[Login Response] Sending tier notification to client:`, tierNotification);
+                    }
                 } else {
                     res.status(401).json({
                         success: false,

@@ -11,6 +11,7 @@ import AvailableBikes from './components/AvailableBikes';
 import MyRentals from './components/MyRentals';
 import PricingDisplay from './components/PricingDisplay';
 import Payment from './components/Payment';
+import TierNotification from './components/TierNotification';
 import { Route, Routes, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import RoleBasedNavbar from './components/RoleBasedNavbar';
@@ -32,10 +33,14 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 
 // Main App Content
 const AppContent = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, tierNotification, clearTierNotification } = useAuth();
 
   return (
     <div className='App'>
+      <TierNotification 
+        notification={tierNotification}
+        onClose={clearTierNotification}
+      />
       <RoleBasedNavbar user={user} onLogout={logout} />
       <Routes>
         <Route path='/' element={<Home />} />

@@ -1,14 +1,14 @@
 import React, { useEffect } from 'react';
 import './style/TierNotification.css';
 
-const TierNotification = ({ notification, onClose }) => {
+const TierNotification = ({ notification, onClose, autoClose = true }) => {
     useEffect(() => {
-        if (notification) {
+        if (notification && autoClose) {
             console.log('[TierNotification] Displaying notification:', notification);
             const timer = setTimeout(onClose, 3000);
             return () => clearTimeout(timer);
         }
-    }, [notification, onClose]);
+    }, [notification, onClose, autoClose]);
 
     if (!notification) {
         return null;
