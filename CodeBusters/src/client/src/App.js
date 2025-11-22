@@ -6,6 +6,7 @@ import Analytics from './pages/Analytics';
 import Register from './pages/Register';
 import Plans from './pages/Plans';
 import Profile from './pages/Profile';
+import Leaderboard from './pages/Leaderboard';
 import MapComponent from './components/MapComponent';
 import AvailableBikes from './components/AvailableBikes';
 import MyRentals from './components/MyRentals';
@@ -71,6 +72,11 @@ const AppContent = () => {
         <Route path='/rider/rentals' element={
           <ProtectedRoute allowedRoles={['rider']}>
             <MyRentals />
+          </ProtectedRoute>
+        } />
+        <Route path='/leaderboard' element={
+          <ProtectedRoute allowedRoles={['rider']}>
+            <Leaderboard />
           </ProtectedRoute>
         } />
         <Route path='/rider/profile' element={

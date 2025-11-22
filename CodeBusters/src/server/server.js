@@ -1394,6 +1394,35 @@ function setupRoutes() {
         }
     });
 
+    // Get leaderboard - riders ranked by number of trips
+    app.get('/api/leaderboard', (req, res) => {
+        db.all(`
+            SELECT 
+                u.id as user_id,
+                u.username,
+                COUNT(r.id) as trip_count
+            FROM users u
+            LEFT JOIN rentals r ON u.id = r.user_id AND r.status = 'completed'
+            WHERE u.role = 'rider'
+            GROUP BY u.id, u.username
+            ORDER BY trip_count DESC, u.username ASC
+        `, (err, rows) => {
+            if (err) {
+                console.error('Error fetching leaderboard:', err);
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            console.log('Leaderboard query result:', rows);
+            // Add rank based on position in result set
+            const leaderboardWithRanks = rows ? rows.map((row, index) => ({
+                ...row,
+                rank: index + 1
+            })) : [];
+            console.log('Leaderboard with ranks:', leaderboardWithRanks);
+            res.json({ leaderboard: leaderboardWithRanks });
+        });
+    });
+
     // Add a new bike (operator only)
     app.post('/api/bikes', authenticateUser, requireOperator, (req, res) => {
         const { bike_id, model, location, battery_level } = req.body;

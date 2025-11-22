@@ -28,6 +28,9 @@ const RiderNavbar = ({ user, onLogout }) => (
             <NavLink to="/rider/rentals">
                 My Rentals
             </NavLink>
+            <NavLink to="/leaderboard">
+                Leaderboard
+            </NavLink>
             <NavLink to="/profile">
                 Profile
             </NavLink>
