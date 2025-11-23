@@ -1232,7 +1232,7 @@ function setupRoutes() {
                 const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
                 
                 // Determine bike type from ID
-                const bikeIdNum = parseInt(row.bike_id.replace('BIKE', ''));
+                const bikeIdNum = parseInt(String(row.bike_id).replace('BIKE', ''));
                 const eBikeIds = [2, 5, 7, 10, 12, 14, 17, 19, 21, 23, 24, 27, 29, 32, 34, 36, 37, 39, 42, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61, 64, 66, 68, 70, 72, 74, 76];
                 const bikeType = eBikeIds.includes(bikeIdNum) ? 'electric' : 'standard';
                 const cost = row.total_cost || 0;
@@ -1526,7 +1526,7 @@ function setupRoutes() {
                 COUNT(r.id) as trip_count
             FROM users u
             LEFT JOIN rentals r ON u.id = r.user_id AND r.status = 'completed'
-            WHERE u.role = 'rider'
+            WHERE u.role IN ('rider', 'dual')
             GROUP BY u.id, u.username
             ORDER BY trip_count DESC, u.username ASC
         `, (err, rows) => {
@@ -3697,6 +3697,85 @@ app.get('/api/notifications/stations', (req, res) => {
 // Start server
 async function startServer() {
     await initializeApp();
+
+    // ============ FORUM ROUTES ============
+    
+    // Get all forum posts (public)
+    app.get('/api/forum/posts', (req, res) => {
+        const query = `
+            SELECT fp.id, fp.content, fp.created_at, u.username
+            FROM forum_posts fp
+            JOIN users u ON fp.user_id = u.id
+            ORDER BY fp.created_at DESC
+        `;
+        
+        db.all(query, [], (err, rows) => {
+            if (err) {
+                console.error('Error fetching forum posts:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error fetching forum posts',
+                    error: err.message
+                });
+            }
+            
+            res.json({
+                success: true,
+                posts: rows || []
+            });
+        });
+    });
+    
+    // Create a new forum post (riders only)
+    app.post('/api/forum/posts', authenticateUser, requireRider, (req, res) => {
+        const { content } = req.body;
+        const userId = req.user.id;
+        
+        console.log(`Forum post request from user: ${userId} (${req.user.username})`);
+        
+        // Validate content
+        if (!content || content.trim().length === 0) {
+            console.warn(`Empty post content from user ${userId}`);
+            return res.status(400).json({
+                success: false,
+                message: 'Post content cannot be empty'
+            });
+        }
+        
+        if (content.length > 5000) {
+            console.warn(`Post too long from user ${userId}: ${content.length} characters`);
+            return res.status(400).json({
+                success: false,
+                message: 'Post content cannot exceed 5000 characters'
+            });
+        }
+        
+        const query = `
+            INSERT INTO forum_posts (user_id, content, created_at, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `;
+        
+        db.run(query, [userId, content], function(err) {
+            if (err) {
+                console.error('Error creating forum post:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error creating forum post',
+                    error: err.message
+                });
+            }
+            
+            console.log(`Forum post created successfully - Post ID: ${this.lastID}, User: ${userId}`);
+            res.status(201).json({
+                success: true,
+                message: 'Forum post created successfully',
+                postId: this.lastID
+            });
+        });
+    });
+    
+    // ============ END FORUM ROUTES ============
+    
     app.listen(PORT, () => {
         console.log(`🚀 Server running on http://localhost:${PORT}`);
         console.log(`📱 Frontend should be running on http://localhost:3000`);

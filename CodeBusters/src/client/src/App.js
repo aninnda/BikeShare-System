@@ -7,6 +7,7 @@ import Register from './pages/Register';
 import Plans from './pages/Plans';
 import Profile from './pages/Profile';
 import Leaderboard from './pages/Leaderboard';
+import Forum from './pages/Forum';
 import MapComponent from './components/MapComponent';
 import AvailableBikes from './components/AvailableBikes';
 import MyRentals from './components/MyRentals';
@@ -78,6 +79,11 @@ const AppContent = () => {
         <Route path='/leaderboard' element={
           <ProtectedRoute allowedRoles={['rider']}>
             <Leaderboard />
+          </ProtectedRoute>
+        } />
+        <Route path='/forum' element={
+          <ProtectedRoute allowedRoles={['rider', 'dual']}>
+            <Forum />
           </ProtectedRoute>
         } />
         <Route path='/rider/profile' element={

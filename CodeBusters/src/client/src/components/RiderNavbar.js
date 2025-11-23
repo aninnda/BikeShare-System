@@ -31,6 +31,9 @@ const RiderNavbar = ({ user, onLogout }) => (
             <NavLink to="/leaderboard">
                 Leaderboard
             </NavLink>
+            <NavLink to="/forum">
+                Forum
+            </NavLink>
             <NavLink to="/profile">
                 Profile
             </NavLink>
