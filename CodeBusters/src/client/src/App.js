@@ -23,8 +23,9 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+  // Treat 'dual' users as both rider and operator
+  const effectiveRoles = user.role === 'dual' ? ['dual', 'rider', 'operator'] : [user.role];
+  if (allowedRoles.length > 0 && !allowedRoles.some(r => effectiveRoles.includes(r))) {
     return <Navigate to="/" replace />;
   }
   
@@ -51,7 +52,7 @@ const AppContent = () => {
         
         {/* Rider Routes */}
         <Route path='/rider/dashboard' element={
-          <ProtectedRoute allowedRoles={['rider']}>
+          <ProtectedRoute allowedRoles={['rider', 'dual']}>
             <div style={{ padding: '20px' }}>
               <h1 style={{ color: '#922338', textAlign: 'center', marginBottom: '20px' }}>
                 Rider Dashboard
@@ -61,7 +62,7 @@ const AppContent = () => {
           </ProtectedRoute>
         } />
         <Route path='/rider/bikes' element={
-          <ProtectedRoute allowedRoles={['rider']}>
+          <ProtectedRoute allowedRoles={['rider', 'dual']}>
             <AvailableBikes />
           </ProtectedRoute>
         } />
@@ -69,26 +70,26 @@ const AppContent = () => {
             <Plans />
         } />
         <Route path='/rider/rentals' element={
-          <ProtectedRoute allowedRoles={['rider']}>
+          <ProtectedRoute allowedRoles={['rider', 'dual']}>
             <MyRentals />
           </ProtectedRoute>
         } />
         <Route path='/rider/profile' element={
-          <ProtectedRoute allowedRoles={['rider']}>
+          <ProtectedRoute allowedRoles={['rider', 'dual']}>
             <Profile />
           </ProtectedRoute>
         } />
         
         {/* Profile Route - Available to both riders and operators */}
         <Route path='/profile' element={
-          <ProtectedRoute allowedRoles={['rider', 'operator']}>
+          <ProtectedRoute allowedRoles={['rider', 'operator', 'dual']}>
             <Profile />
           </ProtectedRoute>
         } />
         
         {/* R-BMS-01 Map Routes - Available to both riders and operators */}
         <Route path='/map' element={
-          <ProtectedRoute allowedRoles={['rider', 'operator']}>
+          <ProtectedRoute allowedRoles={['rider', 'operator', 'dual']}>
             <div style={{ padding: '20px' }}>
               <MapComponent />
             </div>
@@ -97,22 +98,22 @@ const AppContent = () => {
         
         {/* Operator Routes */}
         <Route path='/operator/bikes' element={
-          <ProtectedRoute allowedRoles={['operator']}>
+          <ProtectedRoute allowedRoles={['operator', 'dual']}>
             <ManageBikes/>
           </ProtectedRoute>
         } />
         <Route path='/operator/rentals' element={
-          <ProtectedRoute allowedRoles={['operator']}>
+          <ProtectedRoute allowedRoles={['operator', 'dual']}>
             <div>All Rentals</div>
           </ProtectedRoute>
         } />
         <Route path='/operator/analytics' element={
-          <ProtectedRoute allowedRoles={['operator']}>
+          <ProtectedRoute allowedRoles={['operator', 'dual']}>
             <Analytics />
           </ProtectedRoute>
         } />
         <Route path='/payment' element={
-          <ProtectedRoute allowedRoles={['rider']}>
+          <ProtectedRoute allowedRoles={['rider', 'dual']}>
             <PaymentWrapper />
           </ProtectedRoute>
         } />

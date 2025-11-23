@@ -25,6 +25,12 @@ const OperatorNavbar = ({ user, onLogout }) => (
             <NavLink to="/operator/analytics">
                 Analytics
             </NavLink>
+                {user && user.role === 'dual' && (
+                    <NavLink to="/profile">
+                        Profile
+                    </NavLink>
+                )}
+                {/* Dual view switching moved to Account Role in Profile */}
             <NavLink to="/plans">
                 Plans
             </NavLink>
@@ -33,6 +39,30 @@ const OperatorNavbar = ({ user, onLogout }) => (
             <span className="operator-username">
                 {user?.username} (Operator)
             </span>
+            {user?.role === 'dual' && (
+                <select 
+                    value="operator"
+                    onChange={(e) => {
+                        const newView = e.target.value;
+                        localStorage.setItem('dual_view', newView);
+                        window.dispatchEvent(new CustomEvent('dualViewChange', { detail: newView }));
+                    }}
+                    style={{
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '2px solid #fff',
+                        fontSize: '14px',
+                        backgroundColor: '#1a5490',
+                        color: '#fff',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        marginRight: '10px'
+                    }}
+                >
+                    <option value="rider"> Rider View</option>
+                    <option value="operator"> Operator View</option>
+                </select>
+            )}
             <button 
                 onClick={onLogout}
                 className="operator-logout-button"
