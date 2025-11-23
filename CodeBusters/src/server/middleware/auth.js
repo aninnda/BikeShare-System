@@ -23,7 +23,8 @@ const authenticateUser = (req, res, next) => {
     }
 
     // Validate role is one of the allowed values
-    const allowedRoles = ['rider', 'operator', 'admin'];
+    // 'dual' users act as both rider and operator
+    const allowedRoles = ['rider', 'operator', 'admin', 'dual'];
     if (!allowedRoles.includes(userRole)) {
         return res.status(403).json({
             success: false,
@@ -58,7 +59,11 @@ const requireRole = (allowedRoles) => {
         // Convert single role to array for consistent handling
         const roles = Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles];
 
-        if (!roles.includes(req.user.role)) {
+        // If a user has role 'dual' treat them as both 'rider' and 'operator'
+        const effectiveUserRoles = req.user.role === 'dual' ? ['dual', 'rider', 'operator'] : [req.user.role];
+
+        const hasAccess = roles.some(r => effectiveUserRoles.includes(r));
+        if (!hasAccess) {
             return res.status(403).json({
                 success: false,
                 message: `Access denied. Required role(s): ${roles.join(', ')}. Your role: ${req.user.role}`,
@@ -92,8 +97,8 @@ const requireOwnershipOrOperator = (req, res, next) => {
         });
     }
 
-    // Operators can access any resource
-    if (req.user.role === 'operator' || req.user.role === 'admin') {
+    // Operators (and dual users) can access any resource
+    if (req.user.role === 'operator' || req.user.role === 'dual' || req.user.role === 'admin') {
         return next();
     }
 
