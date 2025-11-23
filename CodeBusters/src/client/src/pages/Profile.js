@@ -648,17 +648,16 @@ const Billing = ({ userId }) => {
 const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance, selectedRole, onRoleChange, onViewChange }) => {
     // Loyalty tier info
     const loyaltyTiers = {
-        'Entry': { icon: '', color: '#6c757d', perks: 'No perks' },
-        'Bronze': { icon: '', color: '#CD7F32', perks: '$2 discount on every 5th ride' },
-        'Silver': { icon: '', color: '#C0C0C0', perks: '10% discount on all rides' },
-        'Gold': { icon: '', color: '#FFD700', perks: '15% discount + Priority support' },
-        'Platinum': { icon: '', color: '#00D4FF', perks: '20% discount + Free reservations' }
+        'None': { icon: '', color: '#6c757d', perks: 'No perks' },
+        'Bronze': { icon: '', color: '#CD7F32', perks: '5% discount on trips' },
+        'Silver': { icon: '', color: '#C0C0C0', perks: '10% discount on trips + 2-minute reservation hold' },
+        'Gold': { icon: '', color: '#FFD700', perks: '15% discount on trips + 5-minute reservation hold' }
     };
 
-    const currentTier = loyaltyTiers[loyaltyTier] || loyaltyTiers['Entry'];
+    const currentTier = loyaltyTiers[loyaltyTier] || loyaltyTiers['None'];
     const isDualRole = userRole === 'operator' || userRole === 'dual';
 
-    const badgeColor = loyaltyTier === 'Entry' ? '#6c757d' : '#17a2b8';
+    const badgeColor = currentTier.color;
     const tierBadgeStyle = {
         display: 'inline-block',
         padding: '12px 20px',
@@ -730,7 +729,7 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
                         onClick={() => { if (typeof onViewChange === 'function') { onViewChange('flex-dollars-history'); } else { window.location.hash = '#flex-dollars-history'; } }}
                         style={{
                             padding: '10px 20px',
-                            backgroundColor: loyaltyTier === 'Entry' ? '#6c757d' : '#17a2b8',
+                            backgroundColor: loyaltyTier === 'None' ? '#6c757d' : '#17a2b8',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
@@ -1031,17 +1030,57 @@ const Profile = () => {
         }
     }, [hasIncompleteProfile, setIsEditing]);
 
+    // Fetch loyalty tier from server and update local state
+    const fetchLoyaltyTier = useCallback(async () => {
+        if (!user?.id) return;
+        
+        try {
+            const response = await fetch(`http://localhost:5001/api/users/${user.id}/loyalty`, {
+                headers: {
+                    'x-user-id': String(user.id),
+                    'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await response.json();
+            
+            if (data.success && data.loyalty && data.loyalty.currentTier) {
+                // Convert to proper casing: 'bronze' -> 'Bronze', 'none' -> 'None'
+                const tierName = data.loyalty.currentTier.toLowerCase() === 'none' 
+                    ? 'None' 
+                    : data.loyalty.currentTier.charAt(0).toUpperCase() + data.loyalty.currentTier.slice(1).toLowerCase();
+                setLoyaltyTier(tierName);
+            }
+        } catch (error) {
+            console.error('Error fetching loyalty tier:', error);
+        }
+    }, [user?.id, user?.role]);
+
+    // Initialize loyalty tier from user context or fetch from server
+    useEffect(() => {
+        if (user?.loyaltyTier) {
+            // Convert to proper casing: 'bronze' -> 'Bronze', 'none' -> 'None'
+            const tierName = user.loyaltyTier.toLowerCase() === 'none' 
+                ? 'None' 
+                : user.loyaltyTier.charAt(0).toUpperCase() + user.loyaltyTier.slice(1).toLowerCase();
+            setLoyaltyTier(tierName);
+        } else {
+            fetchLoyaltyTier();
+        }
+    }, [user?.id, user?.loyaltyTier, fetchLoyaltyTier]);
+
     // Listen for loyalty tier updates from other components (after return bike, etc)
     useEffect(() => {
         const handleTierUpdate = (event) => {
             // The tier has been updated via context/localStorage, 
             // component will re-render automatically from context change
             console.log('Loyalty tier updated:', event.detail);
+            fetchLoyaltyTier();
         };
 
         window.addEventListener('tierUpdated', handleTierUpdate);
         return () => window.removeEventListener('tierUpdated', handleTierUpdate);
-    }, []);
+    }, [fetchLoyaltyTier]);
 
 
     const handleChange = (e) => {
