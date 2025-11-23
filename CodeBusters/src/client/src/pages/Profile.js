@@ -1031,6 +1031,18 @@ const Profile = () => {
         }
     }, [hasIncompleteProfile, setIsEditing]);
 
+    // Listen for loyalty tier updates from other components (after return bike, etc)
+    useEffect(() => {
+        const handleTierUpdate = (event) => {
+            // The tier has been updated via context/localStorage, 
+            // component will re-render automatically from context change
+            console.log('Loyalty tier updated:', event.detail);
+        };
+
+        window.addEventListener('tierUpdated', handleTierUpdate);
+        return () => window.removeEventListener('tierUpdated', handleTierUpdate);
+    }, []);
+
 
     const handleChange = (e) => {
         setFormData({
