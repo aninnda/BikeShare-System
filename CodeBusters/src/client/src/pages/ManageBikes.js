@@ -29,9 +29,9 @@ const ManageBikes = () => {
         toStationId: ''
     });
 
-    // Check if user is operator
+    // Check if user is operator (allow 'dual' as operator-equivalent)
     useEffect(() => {
-        if (!user || user.role !== 'operator') {
+        if (!user || (user.role !== 'operator' && user.role !== 'dual')) {
             navigate('/');
         }
     }, [user, navigate]);

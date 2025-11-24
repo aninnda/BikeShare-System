@@ -1,0 +1,57 @@
+/* Tier Notification Styles */
+
+.tier-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 16px 20px;
+    z-index: 9999;
+    opacity: 0;
+    transform: translateX(400px);
+    transition: all 0.3s ease-out;
+    border-left: 4px solid;
+}
+
+.tier-notification.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.tier-notification.promotion {
+    border-left-color: #FFD700;
+    background: linear-gradient(135deg, #fffbf0 0%, #ffffff 100%);
+}
+
+.tier-notification.demotion {
+    border-left-color: #FF6B6B;
+    background: linear-gradient(135deg, #fff5f5 0%, #ffffff 100%);
+}
+
+.notification-content {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+.notification-message {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+}
+
+/* Responsive Design */
+@media (max-width: 480px) {
+    .tier-notification {
+        right: 10px;
+        left: 10px;
+        top: 10px;
+    }
+
+    .notification-message {
+        font-size: 14px;
+    }
+}

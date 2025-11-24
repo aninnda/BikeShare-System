@@ -1,0 +1,250 @@
+.leaderboard-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 2rem;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.leaderboard-header {
+    margin-bottom: 2rem;
+}
+
+.leaderboard-header h1 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+    font-size: 2rem;
+    font-weight: 600;
+}
+
+.leaderboard-header .subtitle {
+    color: #7f8c8d;
+    font-size: 1rem;
+    margin: 0;
+}
+
+/* Current User Card */
+.current-user-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-left: 4px solid #3498db;
+}
+
+.user-rank-badge {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #3498db;
+    min-width: 70px;
+    text-align: center;
+}
+
+.user-rank-info {
+    flex: 1;
+}
+
+.user-rank-label {
+    margin: 0 0 0.5rem 0;
+    color: #7f8c8d;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.user-rank-name {
+    margin: 0 0 0.5rem 0;
+    color: #2c3e50;
+    font-size: 1.3rem;
+    font-weight: 600;
+}
+
+.user-rank-trips {
+    margin: 0;
+    color: #7f8c8d;
+    font-size: 0.95rem;
+}
+
+/* Leaderboard Table */
+.leaderboard-table-wrapper {
+    background: white;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+.leaderboard-table thead {
+    background-color: #34495e;
+    color: white;
+}
+
+.leaderboard-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.leaderboard-table tbody tr {
+    border-bottom: 1px solid #ecf0f1;
+    transition: background-color 0.2s ease;
+}
+
+.leaderboard-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.leaderboard-table tbody tr.current-user {
+    background-color: #e8f4f8;
+    font-weight: 500;
+}
+
+.leaderboard-table tbody tr.current-user:hover {
+    background-color: #d0e8f2;
+}
+
+.leaderboard-table td {
+    padding: 1rem;
+    color: #2c3e50;
+    font-size: 0.95rem;
+}
+
+/* Rank Styling */
+.rank-col {
+    width: 80px;
+    font-weight: 600;
+}
+
+.rank-number {
+    font-weight: 700;
+    font-size: 1rem;
+    color: #3498db;
+}
+
+/* Name Column */
+.name-col {
+    flex: 1;
+    font-weight: 500;
+    color: #2c3e50;
+}
+
+/* Trips Column */
+.trips-col {
+    width: 100px;
+    text-align: center;
+    font-weight: 600;
+    color: #27ae60;
+}
+
+.leaderboard-table tbody tr.top-1 .trips-col {
+    color: #d4af37;
+}
+
+.leaderboard-table tbody tr.top-2 .trips-col {
+    color: #c0c0c0;
+}
+
+.leaderboard-table tbody tr.top-3 .trips-col {
+    color: #cd7f32;
+}
+
+/* Loading and Error States */
+.loading,
+.error,
+.no-data {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    font-size: 1rem;
+    color: #7f8c8d;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.error {
+    color: #e74c3c;
+    border-left: 4px solid #e74c3c;
+}
+
+.no-data {
+    border: 1px solid #bdc3c7;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .leaderboard-container {
+        padding: 1.5rem;
+    }
+
+    .leaderboard-header h1 {
+        font-size: 1.5rem;
+    }
+
+    .current-user-card {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.9rem;
+    }
+
+    .rank-col {
+        width: 60px;
+    }
+
+    .trips-col {
+        width: 80px;
+    }
+}
+
+@media (max-width: 480px) {
+    .leaderboard-container {
+        padding: 1rem;
+    }
+
+    .leaderboard-header h1 {
+        font-size: 1.3rem;
+    }
+
+    .leaderboard-header .subtitle {
+        font-size: 0.9rem;
+    }
+
+    .current-user-card {
+        padding: 1rem;
+        gap: 1rem;
+    }
+
+    .user-rank-badge {
+        font-size: 1.5rem;
+    }
+
+    .leaderboard-table th,
+    .leaderboard-table td {
+        padding: 0.7rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .rank-col {
+        width: 50px;
+    }
+
+    .trips-col {
+        width: 70px;
+    }
+}

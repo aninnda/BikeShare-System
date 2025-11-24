@@ -398,6 +398,42 @@ const Billing = ({ userId }) => {
     const [billing, setBilling] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [localFlexBalance, setLocalFlexBalance] = useState(null);
+    const [paymentMethod, setPaymentMethod] = useState(null);
+
+    const fetchLocalFlexBalance = useCallback(async () => {
+        if (!user?.id) return;
+        try {
+            const resp = await fetch('http://localhost:5001/api/flex-dollars/balance', {
+                headers: {
+                    'x-user-id': String(user.id),
+                    'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await resp.json();
+            if (data && data.success) setLocalFlexBalance(data.balance || 0);
+        } catch (e) {
+            console.warn('Billing.fetchLocalFlexBalance error:', e);
+        }
+    }, [user?.id, user?.role]);
+
+    const fetchPaymentMethod = useCallback(async () => {
+        if (!userId) return;
+        try {
+            const resp = await fetch(`http://localhost:5001/api/payment-methods/${userId}`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await resp.json();
+            if (data.success && data.paymentMethod) {
+                setPaymentMethod(data.paymentMethod);
+            }
+        } catch (err) {
+            console.error('Error fetching payment method:', err);
+        }
+    }, [userId]);
 
     const fetchBilling = useCallback(async () => {
         if (!userId) return;
@@ -414,6 +450,8 @@ const Billing = ({ userId }) => {
             const data = await resp.json();
             if (data.success) {
                 setBilling(data.billing || []);
+                // Refresh this component's flex dollars balance
+                fetchLocalFlexBalance();
             } else {
                 setError(data.message || 'Failed to load billing history');
             }
@@ -423,23 +461,57 @@ const Billing = ({ userId }) => {
         } finally {
             setLoading(false);
         }
-    }, [userId, user]);
+    }, [userId, user, fetchLocalFlexBalance]);
 
-    useEffect(() => { fetchBilling(); }, [fetchBilling]);
-
-    const totalCost = billing.reduce((sum, it) => sum + (Number(it.totalCost) || 0), 0);
-
+    useEffect(() => { 
+        fetchBilling();
+        fetchPaymentMethod();
+    }, [fetchBilling, fetchPaymentMethod]);
+    
+    // Compute totals - only include unpaid rentals
+    const totalCost = billing.reduce((sum, it) => {
+        // If amountDueAfterFlex exists and is 0, the rental is paid
+        const isPaid = it.amountDueAfterFlex !== null && it.amountDueAfterFlex !== undefined && Number(it.amountDueAfterFlex) === 0;
+        return sum + (isPaid ? 0 : (Number(it.totalCost) || 0));
+    }, 0);
+    
+    const availableFlex = Number(localFlexBalance) || 0; // user's balance fetched locally
+    // We'll apply up to the available flex dollars against the total outstanding
+    const totalFlexApplied = Math.min(availableFlex, totalCost);
+    const totalAmountDueAfterFlex = Math.max(0, totalCost - totalFlexApplied);
+    // Dual users receive a 20% discount on the payment amount (applies after flex)
+    const isDual = user?.role === 'dual';
+    const dualDiscountRate = isDual ? 0.20 : 0;
+    const dualDiscountAmount = isDual ? +(totalAmountDueAfterFlex * dualDiscountRate) : 0;
+    const finalAmountDue = Math.max(0, +(totalAmountDueAfterFlex - dualDiscountAmount));
+    
     const handlePayTotal = () => {
-        const selectedPlan = { title: 'Outstanding Charges', price: `$${totalCost.toFixed(2)}`, amount: totalCost };
+        // Get all unpaid rental IDs
+        const unpaidRentalIds = billing
+            .filter(item => {
+                const isPaid = item.amountDueAfterFlex !== null && item.amountDueAfterFlex !== undefined && Number(item.amountDueAfterFlex) === 0;
+                return !isPaid && Number(item.totalCost || 0) > 0;
+            })
+            .map(item => item.rentalId);
+        
+        const selectedPlan = { 
+            title: 'Outstanding Charges', 
+            price: `$${finalAmountDue.toFixed(2)}`, 
+            amount: finalAmountDue,
+            originalAmount: totalCost,
+            flexApplied: totalFlexApplied,
+            dualDiscount: dualDiscountAmount,
+            rentalIds: unpaidRentalIds, // Pass array of rental IDs
+            isBatchPayment: true
+        };
         navigate('/payment', { state: { selectedPlan } });
     };
-
+    
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 style={{ margin: 0 }}>Billing</h2>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12 }}>
                 <div>
-                    <button onClick={fetchBilling} disabled={loading} style={{ padding: 8, borderRadius: 8, backgroundColor: '#007bff', color: 'white', border: 'none' }}>
+                    <button onClick={fetchBilling} disabled={loading} style={{ padding: '8px 12px', borderRadius: 8, backgroundColor: '#007bff', color: 'white', border: 'none' }}>
                         {loading ? 'Refreshing...' : 'Refresh'}
                     </button>
                 </div>
@@ -447,12 +519,70 @@ const Billing = ({ userId }) => {
 
             {error && <div style={{ color: '#dc3545', marginTop: 12 }}>{error}</div>}
 
-            <div style={{ marginTop: 16, padding: 12, backgroundColor: '#f8f9fa', borderRadius: 8 }}>
-                <strong>Total Outstanding:</strong>
-                <div style={{ fontSize: '1.4rem', fontWeight: '800', color: totalCost > 0 ? '#d9534f' : '#28a745' }}>${totalCost.toFixed(2)}</div>
-                <div style={{ marginTop: 8 }}>
-                    <button onClick={handlePayTotal} disabled={totalCost <= 0} style={{ padding: '10px 14px', borderRadius: 8, backgroundColor: '#28a745', color: 'white', border: 'none' }}>
-                        Pay Total
+            {/* Payment Method Section */}
+            {paymentMethod && (
+                <div style={{ 
+                    marginTop: 16, 
+                    marginBottom: 20,
+                    padding: '20px', 
+                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                    borderRadius: '12px',
+                    color: 'white',
+                    boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)'
+                }}>
+                    <h3 style={{ margin: '0 0 15px 0', fontSize: '1.1rem', fontWeight: '600' }}> Payment Method</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ fontSize: '2.5rem' }}></div>
+                        <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: '1.2rem', fontWeight: '600', letterSpacing: '2px', marginBottom: '6px' }}>
+                                •••• •••• •••• {paymentMethod.card_number_last4}
+                            </div>
+                            <div style={{ fontSize: '0.95rem', opacity: 0.9, marginBottom: '4px', textTransform: 'uppercase' }}>
+                                {paymentMethod.card_holder_name}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', opacity: 0.8 }}>
+                                Expires: {paymentMethod.expiry_date}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <div style={{ marginTop: 16 }}>
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Original Outstanding</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#343a40', marginTop: 4 }}>${totalCost.toFixed(2)}</div>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Flex Dollars</div>
+                    <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#0d6efd', marginTop: 4 }}>
+                        {availableFlex > 0 ? `- $${availableFlex.toFixed(2)}` : '$0.00'}
+                    </div>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Amount After Flex</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: totalAmountDueAfterFlex > 0 ? '#d9534f' : '#198754', marginTop: 6 }}>${totalAmountDueAfterFlex.toFixed(2)}</div>
+                </div>
+
+                {isDual && (
+                    <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Dual Discount (20%)</div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 800, color: '#198754', marginTop: 4 }}>
+                            - ${dualDiscountAmount.toFixed(2)}
+                        </div>
+                    </div>
+                )}
+
+                <div style={{ marginBottom: 10 }}>
+                    <div style={{ fontSize: '0.85rem', color: '#6c757d' }}>Final Amount Due</div>
+                    <div style={{ fontSize: '1.6rem', fontWeight: 900, color: finalAmountDue > 0 ? '#d9534f' : '#198754', marginTop: 6 }}>${finalAmountDue.toFixed(2)}</div>
+                </div>
+
+                <div style={{ marginTop: 6 }}>
+                    <button onClick={handlePayTotal} disabled={totalAmountDueAfterFlex <= 0} style={{ padding: '10px 16px', borderRadius: 8, backgroundColor: '#198754', color: 'white', border: 'none' }}>
+                        {totalAmountDueAfterFlex <= 0 ? '✓ Fully Covered' : 'Pay Total'}
                     </button>
                 </div>
             </div>
@@ -461,17 +591,49 @@ const Billing = ({ userId }) => {
                 {billing.map(item => (
                     <div key={item.rentalId} style={{ padding: 12, marginBottom: 10, background: 'white', borderRadius: 8, border: '1px solid #e9ecef' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                            <div>
+                            <div style={{ flex: 1 }}>
                                 <div style={{ fontWeight: 700 }}>🚲 {item.bikeId} <span style={{ fontWeight: 400, color: '#6c757d' }}>{item.bikeType}</span></div>
                                 <div style={{ color: '#6c757d', fontSize: '0.9rem' }}>{new Date(item.startTime).toLocaleString()} → {item.endTime ? new Date(item.endTime).toLocaleString() : '—'}</div>
                                 <div style={{ marginTop: 6, fontSize: '0.9rem' }}><strong>From:</strong> {item.originStation?.name || item.originStation?.id || 'Unknown'} <span style={{ marginLeft: 12 }}><strong>To:</strong> {item.arrivalStation?.name || item.arrivalStation?.id || 'Unknown'}</span></div>
+                                
+                                {/* (Flex Dollars Applied display removed per request) */}
                             </div>
-                            <div style={{ textAlign: 'right' }}>
+                            <div style={{ textAlign: 'right', marginLeft: 12 }}>
                                 <div style={{ fontSize: '1.1rem', fontWeight: '800' }}>${item.totalCost != null ? Number(item.totalCost).toFixed(2) : '—'}</div>
+                                {/* per-item saved display removed */}
                                 <div style={{ marginTop: 8 }}>
-                                    <button onClick={() => navigate('/payment', { state: { selectedPlan: { title: `Rental ${item.rentalId}`, price: `$${Number(item.totalCost || 0).toFixed(2)}`, amount: Number(item.totalCost || 0) } } })} disabled={!(item.totalCost > 0)} style={{ padding: '8px 10px', borderRadius: 8, backgroundColor: '#007bff', color: 'white', border: 'none' }}>
-                                        Pay
-                                    </button>
+                                    {(() => {
+                                        // If payment exists (amountDueAfterFlex is not null), use it; otherwise calculate
+                                        const isPaid = item.amountDueAfterFlex !== null && item.amountDueAfterFlex !== undefined;
+                                        const amountDue = isPaid ? Number(item.amountDueAfterFlex) : Math.max(0, Number(item.totalCost || 0) - (Number(item.flexDollarsApplied) || 0));
+                                        
+                                        return (
+                                            <button 
+                                                onClick={() => navigate('/payment', { 
+                                                    state: { 
+                                                        selectedPlan: { 
+                                                            title: `Rental ${item.rentalId}`, 
+                                                            price: `$${amountDue.toFixed(2)}`, 
+                                                            amount: amountDue,
+                                                            originalAmount: Number(item.totalCost) || 0,
+                                                            rentalId: item.rentalId
+                                                        } 
+                                                    } 
+                                                })} 
+                                                disabled={amountDue <= 0} 
+                                                style={{ 
+                                                    padding: '8px 10px', 
+                                                    borderRadius: 8, 
+                                                    backgroundColor: amountDue <= 0 ? '#198754' : '#007bff', 
+                                                    color: 'white', 
+                                                    border: 'none',
+                                                    cursor: amountDue <= 0 ? 'not-allowed' : 'pointer'
+                                                }}
+                                            >
+                                                {amountDue <= 0 ? '✓ Paid' : `Pay $${amountDue.toFixed(2)}`}
+                                            </button>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         </div>
@@ -482,6 +644,250 @@ const Billing = ({ userId }) => {
     );
 };
 
+// Account Information Component
+const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance, selectedRole, onRoleChange, onViewChange }) => {
+    // Loyalty tier info
+    const loyaltyTiers = {
+        'None': { icon: '', color: '#6c757d', perks: 'No perks' },
+        'Bronze': { icon: '', color: '#CD7F32', perks: '5% discount on trips' },
+        'Silver': { icon: '', color: '#C0C0C0', perks: '10% discount on trips + 2-minute reservation hold' },
+        'Gold': { icon: '', color: '#FFD700', perks: '15% discount on trips + 5-minute reservation hold' }
+    };
+
+    const currentTier = loyaltyTiers[loyaltyTier] || loyaltyTiers['None'];
+    const isDualRole = userRole === 'operator' || userRole === 'dual';
+
+    const badgeColor = currentTier.color;
+    const tierBadgeStyle = {
+        display: 'inline-block',
+        padding: '12px 20px',
+        borderRadius: '8px',
+        backgroundColor: badgeColor,
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: '18px',
+        marginRight: '15px',
+        marginBottom: '15px',
+        textAlign: 'center',
+        minWidth: '150px'
+    };
+
+    const infoBoxStyle = {
+        padding: '20px',
+        backgroundColor: '#e8f4f8',
+        border: '2px solid #17a2b8',
+        borderRadius: '8px',
+        marginBottom: '20px'
+    };
+
+    const labelStyle = {
+        fontWeight: 'bold',
+        color: '#0c5460',
+        marginBottom: '8px',
+        display: 'block'
+    };
+
+    const valueStyle = {
+        fontSize: '16px',
+        color: '#0c5460',
+        marginBottom: '15px'
+    };
+
+    return (
+        <div>
+            {/* Loyalty Program Section */}
+            <div style={infoBoxStyle}>
+                        <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Loyalty Program</h3>
+                <div style={tierBadgeStyle}>
+                    {currentTier.icon} {loyaltyTier}
+                </div>
+                <div style={valueStyle}>
+                    <strong>Perks:</strong> {currentTier.perks}
+                </div>
+                <div style={{ fontSize: '14px', color: '#666', fontStyle: 'italic' }}>
+                    Complete more rides to unlock higher tiers and earn exclusive benefits!
+                </div>
+            </div>
+
+            {/* Flex Dollars Section  */}
+            <div style={infoBoxStyle}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Flex Dollars</h3>
+                <div style={{
+                    fontSize: '32px',
+                    fontWeight: 'bold',
+                    color: '#155724',
+                    marginBottom: '10px'
+                }}>
+                    ${flexDollarsBalance.toFixed(2)}
+                </div>
+                <div style={valueStyle}>
+                    Earn flex dollars by returning bikes to stations below 25% capacity. 
+                    They're automatically applied to your trips and never expire!
+                </div>
+                <div style={{ marginTop: '12px' }}>
+                    <button
+                        onClick={() => { if (typeof onViewChange === 'function') { onViewChange('flex-dollars-history'); } else { window.location.hash = '#flex-dollars-history'; } }}
+                        style={{
+                            padding: '10px 20px',
+                            backgroundColor: loyaltyTier === 'None' ? '#6c757d' : '#17a2b8',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '4px',
+                            cursor: 'pointer',
+                            fontSize: '14px'
+                        }}
+                    >
+                        View History
+                    </button>
+                </div>
+            </div>
+
+
+
+            {/* Role Display Section (if dual role) */}
+            {isDualRole && (
+                <div style={infoBoxStyle}>
+                    <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Account Role</h3>
+                    <div style={labelStyle}>Currently Viewing As:</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{
+                            padding: '10px 15px',
+                            borderRadius: '6px',
+                            border: '2px solid #007bff',
+                            fontSize: '16px',
+                            backgroundColor: '#e7f3ff',
+                            fontWeight: 'bold',
+                            color: '#007bff'
+                        }}>
+                            {selectedRole === 'rider' ? ' Rider' : ' Operator'}
+                        </div>
+                        <div style={{ color: '#666', fontSize: '14px', textAlign: 'center', maxWidth: '560px' }}>
+                            {selectedRole === 'rider' 
+                                ? 'You can rent bikes, view ride history, and earn flex dollars.' 
+                                : 'You can manage bikes, perform maintenance, and rebalance the network.'}
+                        </div>
+                        <div style={{ color: '#999', fontSize: '12px', fontStyle: 'italic', textAlign: 'center' }}>
+                            Switch views using the navbar dropdown
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Account Details Section */}
+            <div style={infoBoxStyle}>
+                <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#0c5460' }}> Account Details</h3>
+                <div style={valueStyle}>
+                    <strong>Account Type:</strong> {userRole === 'rider' ? ' Rider' : userRole === 'operator' ? ' Operator' : ' ' + userRole}
+                </div>
+                <div style={valueStyle}>
+                    <strong>User ID:</strong> {userId}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Flex Dollars History Component (DM-03, DM-04)
+const FlexDollarsHistory = ({ userId, userRole }) => {
+    const [transactions, setTransactions] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const fetchTransactionHistory = useCallback(async () => {
+        if (!userId) return;
+
+        try {
+            setLoading(true);
+            setError('');
+
+            const response = await fetch(`http://localhost:5001/api/flex-dollars/history?limit=50&offset=0`, {
+                headers: {
+                    'x-user-id': String(userId),
+                    'x-user-role': String(userRole || localStorage.getItem('userRole') || 'rider'),
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await response.json();
+
+            if (data.success) {
+                setTransactions(data.transactions || []);
+            } else {
+                setError('Failed to load flex dollars history');
+            }
+        } catch (err) {
+            console.error('Error fetching flex dollars history:', err);
+            setError('Error loading transaction history');
+        } finally {
+            setLoading(false);
+        }
+    }, [userId]);
+
+    useEffect(() => {
+        fetchTransactionHistory();
+    }, [fetchTransactionHistory]);
+
+    if (loading) return <div>Loading flex dollars history...</div>;
+
+    return (
+        <div style={{ marginTop: '20px' }}>
+            {error && <div style={{ color: '#dc3545', marginBottom: '10px' }}>{error}</div>}
+
+            {transactions.length === 0 ? (
+                <div style={{ color: '#6c757d', fontStyle: 'italic', textAlign: 'center', padding: '20px' }}>
+                    No flex dollars transactions yet. Start earning by returning bikes to understocked stations!
+                </div>
+            ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
+                    <thead>
+                        <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Date</th>
+                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Type</th>
+                            <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600' }}>Description</th>
+                            <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600' }}>Amount</th>
+                            <th style={{ padding: '12px', textAlign: 'right', fontWeight: '600' }}>Balance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {transactions.map((transaction, idx) => (
+                            <tr key={idx} style={{ borderBottom: '1px solid #dee2e6', backgroundColor: idx % 2 === 0 ? '#fff' : '#f8f9fa' }}>
+                                <td style={{ padding: '12px' }}>
+                                    {new Date(transaction.createdAt).toLocaleDateString()} {new Date(transaction.createdAt).toLocaleTimeString()}
+                                </td>
+                                <td style={{ padding: '12px' }}>
+                                    <span style={{
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '12px',
+                                        fontWeight: 'bold',
+                                        backgroundColor: transaction.type === 'award' ? '#d4edda' : 
+                                                       transaction.type === 'deduct' ? '#f8d7da' : '#e2e3e5',
+                                        color: transaction.type === 'award' ? '#155724' : 
+                                               transaction.type === 'deduct' ? '#721c24' : '#383d41'
+                                    }}>
+                                        {transaction.type === 'award' ? '✓ Award' :
+                                         transaction.type === 'deduct' ? '✗ Used' : 'Refund'}
+                                    </span>
+                                </td>
+                                <td style={{ padding: '12px' }}>{transaction.description}</td>
+                                <td style={{ 
+                                    padding: '12px', 
+                                    textAlign: 'right', 
+                                    fontWeight: 'bold',
+                                    color: transaction.amount >= 0 ? '#28a745' : '#dc3545'
+                                }}>
+                                    {transaction.amount >= 0 ? '+' : ''} ${Math.abs(transaction.amount).toFixed(2)}
+                                </td>
+                                <td style={{ padding: '12px', textAlign: 'right', fontWeight: '600' }}>
+                                    ${transaction.balanceAfter.toFixed(2)}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
+        </div>
+    );
+};
 
 
 const Profile = () => {
@@ -489,6 +895,28 @@ const Profile = () => {
     const [stationNotifications, setStationNotifications] = useState([]);
     const [notifLoading, setNotifLoading] = useState(false);
     const [notifError, setNotifError] = useState('');
+
+    // Flex Dollars state
+    const [flexDollarsBalance, setFlexDollarsBalance] = useState(0);
+
+    // Fetch flex dollars balance
+    const fetchFlexDollarsBalance = async (userId) => {
+        try {
+            const response = await fetch('http://localhost:5001/api/flex-dollars/balance', {
+                headers: {
+                    'x-user-id': String(userId),
+                    'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await response.json();
+            if (data.success) {
+                setFlexDollarsBalance(data.balance);
+            }
+        } catch (err) {
+            console.error('Error fetching flex dollars balance:', err);
+        }
+    };
 
     // Fetch station notifications
     const fetchStationNotifications = async () => {
@@ -515,8 +943,60 @@ const Profile = () => {
     // Check if this is an existing user without profile information
     const hasIncompleteProfile = !user?.firstName || !user?.lastName || !user?.email;
 
+    // Loyalty Tier state
+    const [loyaltyTier, setLoyaltyTier] = useState('Entry');
+    
+    // Initialize selectedRole from localStorage for dual users
+    const [selectedRole, setSelectedRole] = useState(() => {
+        if (user?.role === 'dual') {
+            try {
+                return localStorage.getItem('dual_view') || 'operator';
+            } catch (e) {
+                return 'operator';
+            }
+        }
+        return user?.role || 'rider';
+    });
+
+    // Listen for view changes from navbar
+    useEffect(() => {
+        if (user?.role === 'dual') {
+            const handler = (e) => {
+                if (e && e.detail) {
+                    setSelectedRole(e.detail);
+                }
+            };
+            window.addEventListener('dualViewChange', handler);
+            return () => window.removeEventListener('dualViewChange', handler);
+        }
+    }, [user?.role]);
+
+    // Handle role changes from AccountInformation — persist for dual users
+    const handleRoleChange = (role) => {
+        setSelectedRole(role);
+        try {
+            localStorage.setItem('dual_view', role);
+        } catch (e) {}
+        window.dispatchEvent(new CustomEvent('dualViewChange', { detail: role }));
+        showRoleChangeMessage(role);
+    };
+
+    // Show a small confirmation message when role/view changes
+    const showRoleChangeMessage = (role) => {
+        try {
+            setMessageType('success');
+            setMessage(`View updated — now viewing as ${role === 'rider' ? 'Rider' : 'Operator'}.`);
+            setTimeout(() => {
+                setMessage('');
+                setMessageType('');
+            }, 3000);
+        } catch (e) {
+            // ignore
+        }
+    };
+
     // Declare currentView before any useEffect that uses it
-    const [currentView, setCurrentView] = useState(hasIncompleteProfile ? 'edit' : 'profile'); // profile, edit, history, notifications
+    const [currentView, setCurrentView] = useState(hasIncompleteProfile ? 'edit' : 'profile'); // profile, edit, history, notifications, account
     const [isEditing, setIsEditing] = useState(hasIncompleteProfile);
     const [formData, setFormData] = useState({
         firstName: user?.firstName || '',
@@ -526,6 +1006,7 @@ const Profile = () => {
     });
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [messageType, setMessageType] = useState('');
 
     // Fetch notifications when notifications view is opened
     useEffect(() => {
@@ -534,6 +1015,13 @@ const Profile = () => {
         }
     }, [currentView]);
 
+    // Fetch flex dollars balance when profile is loaded
+    useEffect(() => {
+        if (user?.id) {
+            fetchFlexDollarsBalance(user.id);
+        }
+    }, [user?.id]);
+
     // Initialize view based on profile completeness
     useEffect(() => {
         if (hasIncompleteProfile) {
@@ -541,6 +1029,58 @@ const Profile = () => {
             setIsEditing(true);
         }
     }, [hasIncompleteProfile, setIsEditing]);
+
+    // Fetch loyalty tier from server and update local state
+    const fetchLoyaltyTier = useCallback(async () => {
+        if (!user?.id) return;
+        
+        try {
+            const response = await fetch(`http://localhost:5001/api/users/${user.id}/loyalty`, {
+                headers: {
+                    'x-user-id': String(user.id),
+                    'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
+                    'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
+                }
+            });
+            const data = await response.json();
+            
+            if (data.success && data.loyalty && data.loyalty.currentTier) {
+                // Convert to proper casing: 'bronze' -> 'Bronze', 'none' -> 'None'
+                const tierName = data.loyalty.currentTier.toLowerCase() === 'none' 
+                    ? 'None' 
+                    : data.loyalty.currentTier.charAt(0).toUpperCase() + data.loyalty.currentTier.slice(1).toLowerCase();
+                setLoyaltyTier(tierName);
+            }
+        } catch (error) {
+            console.error('Error fetching loyalty tier:', error);
+        }
+    }, [user?.id, user?.role]);
+
+    // Initialize loyalty tier from user context or fetch from server
+    useEffect(() => {
+        if (user?.loyaltyTier) {
+            // Convert to proper casing: 'bronze' -> 'Bronze', 'none' -> 'None'
+            const tierName = user.loyaltyTier.toLowerCase() === 'none' 
+                ? 'None' 
+                : user.loyaltyTier.charAt(0).toUpperCase() + user.loyaltyTier.slice(1).toLowerCase();
+            setLoyaltyTier(tierName);
+        } else {
+            fetchLoyaltyTier();
+        }
+    }, [user?.id, user?.loyaltyTier, fetchLoyaltyTier]);
+
+    // Listen for loyalty tier updates from other components (after return bike, etc)
+    useEffect(() => {
+        const handleTierUpdate = (event) => {
+            // The tier has been updated via context/localStorage, 
+            // component will re-render automatically from context change
+            console.log('Loyalty tier updated:', event.detail);
+            fetchLoyaltyTier();
+        };
+
+        window.addEventListener('tierUpdated', handleTierUpdate);
+        return () => window.removeEventListener('tierUpdated', handleTierUpdate);
+    }, [fetchLoyaltyTier]);
 
 
     const handleChange = (e) => {
@@ -725,9 +1265,9 @@ const Profile = () => {
         marginBottom: '20px',
         textAlign: 'center',
         fontWeight: '500',
-        backgroundColor: message.includes('success') ? '#d4edda' : '#f8d7da',
-        color: message.includes('success') ? '#155724' : '#721c24',
-        border: `1px solid ${message.includes('success') ? '#c3e6cb' : '#f5c6cb'}`
+        backgroundColor: messageType === 'success' ? '#d4edda' : '#f8d7da',
+        color: messageType === 'success' ? '#155724' : '#721c24',
+        border: `1px solid ${messageType === 'success' ? '#c3e6cb' : '#f5c6cb'}`
     };
 
     const sidebarTitleStyle = {
@@ -847,6 +1387,13 @@ const Profile = () => {
                 </button>
                 
                 <button
+                    onClick={() => setCurrentView('account')}
+                    style={currentView === 'account' ? activeSidebarButtonStyle : {...sidebarButtonStyle, background: 'linear-gradient(135deg, #FF6B35 0%, #D84315 100%)'}}
+                >
+                    Account Information
+                </button>
+                
+                <button
                     onClick={() => setCurrentView('history')}
                     style={currentView === 'history' ? activeSidebarButtonStyle : {...sidebarButtonStyle, background: 'linear-gradient(135deg, #4CAF50 0%, #45a049 100%)'}}
                 >
@@ -928,6 +1475,51 @@ const Profile = () => {
                                     {user.role}
                                 </div>
                             </div>
+                            
+    
+                        </>
+                    )}
+
+                    {/* Flex Dollars History View */}
+                    {currentView === 'flex-dollars-history' && (
+                        <>
+                            <h2 style={titleStyle}>Flex Dollars History</h2>
+                            <FlexDollarsHistory userId={user?.id} userRole={user?.role} />
+                            <button
+                                onClick={() => setCurrentView('account')}
+                                style={{
+                                    marginTop: '20px',
+                                    padding: '10px 20px',
+                                    backgroundColor: '#6c757d',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: 'pointer'
+                                }}
+                            >
+                                Back to Account Information
+                            </button>
+                        </>
+                    )}
+
+                    {/* Account Information View */}
+                    {currentView === 'account' && (
+                        <>
+                            <h2 style={titleStyle}>Account Information</h2>
+                            {message && (
+                                <div style={messageStyle}>
+                                    {message}
+                                </div>
+                            )}
+                            <AccountInformation 
+                                userId={user?.id} 
+                                userRole={user?.role}
+                                loyaltyTier={loyaltyTier}
+                                flexDollarsBalance={flexDollarsBalance}
+                                selectedRole={selectedRole}
+                                onRoleChange={handleRoleChange}
+                                onViewChange={setCurrentView}
+                            />
                         </>
                     )}
 

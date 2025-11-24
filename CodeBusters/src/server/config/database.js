@@ -119,6 +119,44 @@ class Database {
                     last_maintenance DATETIME,
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (current_bike_id) REFERENCES bikes (id)
+                )`,
+                
+                // Flex Dollars transactions table
+                `CREATE TABLE IF NOT EXISTS flex_dollars_transactions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    amount DECIMAL(10,2) NOT NULL,
+                    transaction_type TEXT NOT NULL,
+                    description TEXT,
+                    related_rental_id INTEGER,
+                    related_station_id TEXT,
+                    balance_after DECIMAL(10,2),
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id),
+                    FOREIGN KEY (related_rental_id) REFERENCES rentals (id)
+                )`,
+                
+                // Payment methods table
+                `CREATE TABLE IF NOT EXISTS payment_methods (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    card_number_last4 TEXT NOT NULL,
+                    card_holder_name TEXT NOT NULL,
+                    expiry_date TEXT NOT NULL,
+                    is_default INTEGER DEFAULT 1,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
+                )`,
+                
+                // Forum posts table
+                `CREATE TABLE IF NOT EXISTS forum_posts (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    content TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users (id)
                 )`
             ];
 
@@ -152,7 +190,11 @@ class Database {
                 'ALTER TABLE users ADD COLUMN first_name TEXT',
                 'ALTER TABLE users ADD COLUMN last_name TEXT', 
                 'ALTER TABLE users ADD COLUMN email TEXT',
-                'ALTER TABLE users ADD COLUMN address TEXT'
+                'ALTER TABLE users ADD COLUMN address TEXT',
+                'ALTER TABLE users ADD COLUMN flex_dollars DECIMAL(10,2) DEFAULT 0.00',
+                'ALTER TABLE users ADD COLUMN loyalty_tier TEXT DEFAULT "none"',
+                'ALTER TABLE users ADD COLUMN last_tier_check DATETIME',
+                'CREATE TABLE IF NOT EXISTS loyalty_history (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, old_tier TEXT, new_tier TEXT, reason TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users (id))'
             ];
 
             let completed = 0;

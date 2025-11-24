@@ -39,6 +39,18 @@ const STATION_CONFIG = {
     MAX_CAPACITY: 20
 };
 
+// Business Rule: Flex Dollars Configuration (DM-03, DM-04)
+// Riders receive flex dollars for returning bikes to stations below minimum capacity
+const FLEX_DOLLARS_CONFIG = {
+    MINIMUM_OCCUPANCY_PERCENT: 0.25, // 25% - Below this triggers flex dollars reward (requirement DM-03)
+    REWARD_AMOUNT: 0.50, // $0.50 flex dollars for qualifying return (adjustable)
+    TRANSACTION_TYPE: {
+        AWARD: 'award',
+        DEDUCT: 'deduct',
+        REFUND: 'refund'
+    }
+};
+
 // Business Rules for Occupancy Accounting
 const OCCUPANCY_RULES = {
     // Business Rule: bikesAvailable == count(occupied docks)
@@ -93,6 +105,7 @@ module.exports = {
     BMS_STATES,
     DEFAULT_EXPIRY_MINUTES,
     STATION_CONFIG,
+    FLEX_DOLLARS_CONFIG,
     BMS_OPERATIONS,
     OCCUPANCY_RULES,
     HTTP_STATUS
