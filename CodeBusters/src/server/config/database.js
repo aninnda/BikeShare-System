@@ -192,7 +192,7 @@ class Database {
                 'ALTER TABLE users ADD COLUMN email TEXT',
                 'ALTER TABLE users ADD COLUMN address TEXT',
                 'ALTER TABLE users ADD COLUMN flex_dollars DECIMAL(10,2) DEFAULT 0.00',
-                'ALTER TABLE users ADD COLUMN loyalty_tier TEXT DEFAULT "none"',
+                'ALTER TABLE users ADD COLUMN loyalty_tier TEXT DEFAULT "entry"',
                 'ALTER TABLE users ADD COLUMN last_tier_check DATETIME',
                 'CREATE TABLE IF NOT EXISTS loyalty_history (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, old_tier TEXT, new_tier TEXT, reason TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY (user_id) REFERENCES users (id))'
             ];

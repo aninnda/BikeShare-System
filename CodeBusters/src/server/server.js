@@ -1479,7 +1479,7 @@ function setupRoutes() {
                 });
             }
 
-            const currentTier = user.loyalty_tier || 'none';
+            const currentTier = user.loyalty_tier || 'entry';
             const tierBenefits = loyaltyService.getTierBenefits(currentTier);
 
             // Get loyalty history - gracefully handle if no history exists
@@ -1919,7 +1919,7 @@ function setupRoutes() {
                     let tierNotification = null;
                     if (row.role === 'rider' && loyaltyService) {
                         try {
-                            const currentTier = row.loyalty_tier || 'none';
+                            const currentTier = row.loyalty_tier || 'entry';
                             const newTier = await loyaltyService.calculateUserTier(row.id);
                             const tierUpdateResult = await loyaltyService.updateUserTier(row.id, newTier);
                             
@@ -1927,7 +1927,7 @@ function setupRoutes() {
                             
                             if (tierUpdateResult.tierChanged) {
                                 // Determine if it's a promotion or demotion
-                                const tierOrder = { 'none': 0, 'bronze': 1, 'silver': 2, 'gold': 3 };
+                                const tierOrder = { 'entry': 0, 'bronze': 1, 'silver': 2, 'gold': 3 };
                                 const oldRank = tierOrder[tierUpdateResult.oldTier] || 0;
                                 const newRank = tierOrder[tierUpdateResult.newTier] || 0;
                                 const isPromotion = newRank > oldRank;
@@ -1959,7 +1959,7 @@ function setupRoutes() {
                             email: row.email,
                             address: row.address,
                             role: row.role,
-                            loyaltyTier: row.loyalty_tier || 'none'
+                            loyaltyTier: row.loyalty_tier || 'entry'
                         },
                         tierNotification: tierNotification || null
                     });
@@ -2495,7 +2495,7 @@ function setupRoutes() {
                             db.get('SELECT loyalty_tier FROM users WHERE id = ?', [userId], (tierErr, tierUser) => {
                                 if (!tierErr && tierUser && loyaltyService) {
                                     try {
-                                        const tierBenefits = loyaltyService.getTierBenefits(tierUser.loyalty_tier || 'none');
+                                        const tierBenefits = loyaltyService.getTierBenefits(tierUser.loyalty_tier || 'entry');
                                         reservationHoldMinutes += tierBenefits.reservationExtensionMinutes;
                                     } catch (error) {
                                         console.error('Error applying loyalty extension:', error);
@@ -3359,7 +3359,7 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                                                         // Apply loyalty tier discount
                                                         if (loyaltyService && tierData) {
                                                             try {
-                                                                const userLoyaltyTier = tierData.loyalty_tier || 'none';
+                                                                const userLoyaltyTier = tierData.loyalty_tier || 'entry';
                                                                 const tierBenefits = loyaltyService.getTierBenefits(userLoyaltyTier);
                                                                 const discountPercentage = tierBenefits.discountPercentage;
                                                                 if (discountPercentage > 0) {
@@ -3452,7 +3452,7 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                                                                 try {
                                                                     // Get current tier before calculating new one
                                                                     db.get('SELECT loyalty_tier FROM users WHERE id = ?', [userId], async (tierErr, tierData) => {
-                                                                        const oldTier = tierData?.loyalty_tier || 'none';
+                                                                        const oldTier = tierData?.loyalty_tier || 'entry';
                                                                         
                                                                         // Calculate new tier
                                                                         const newTier = await loyaltyService.calculateUserTier(userId);
@@ -3463,7 +3463,7 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                                                                             console.log(`[Return/Tier] Tier changed - updating from ${oldTier} to ${newTier}`);
                                                                             await loyaltyService.updateUserTier(userId, newTier);
                                                                             
-                                                                            const isPromotion = (oldTier === 'none' || 
+                                                                            const isPromotion = (oldTier === 'entry' || 
                                                                                 (oldTier === 'bronze' && (newTier === 'silver' || newTier === 'gold')) ||
                                                                                 (oldTier === 'silver' && newTier === 'gold'));
                                                                             

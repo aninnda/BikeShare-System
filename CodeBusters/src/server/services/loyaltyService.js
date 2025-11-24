@@ -35,13 +35,13 @@ class LoyaltyService {
     /**
      * Calculate a user's loyalty tier based on their activity history
      * @param {number} userId - The user ID
-     * @returns {Promise<string>} The tier: 'none', 'bronze', 'silver', 'gold'
+     * @returns {Promise<string>} The tier: 'entry', 'bronze', 'silver', 'gold'
      */
     async calculateUserTier(userId) {
         try {
             // Get user's current tier
             const user = await this.getUserData(userId);
-            const currentTier = user?.loyalty_tier || 'none';
+            const currentTier = user?.loyalty_tier || 'entry';
 
             // Check all tier eligibility
             const isGoldEligible = await this.isGoldEligible(userId);
@@ -49,7 +49,7 @@ class LoyaltyService {
             const isBronzeEligible = await this.isBronzeEligible(userId);
 
             // Determine tier (highest to lowest)
-            let newTier = 'none';
+            let newTier = 'entry';
             if (isGoldEligible) {
                 newTier = 'gold';
             } else if (isSilverEligible) {
@@ -61,7 +61,7 @@ class LoyaltyService {
             return newTier;
         } catch (error) {
             console.error('Error calculating user tier:', error);
-            return 'none';
+            return 'entry';
         }
     }
 
@@ -82,7 +82,7 @@ class LoyaltyService {
                 (err, user) => {
                     if (err) return reject(err);
                     
-                    const oldTier = user?.loyalty_tier || 'none';
+                    const oldTier = user?.loyalty_tier || 'entry';
                     
                     // Update user tier
                     this.db.run(
@@ -341,7 +341,7 @@ class LoyaltyService {
      */
     getTierBenefits(tier) {
         const benefits = {
-            none: {
+            entry: {
                 discountPercentage: 0,
                 reservationExtensionMinutes: 0
             },
@@ -358,7 +358,7 @@ class LoyaltyService {
                 reservationExtensionMinutes: 5
             }
         };
-        return benefits[tier] || benefits.none;
+        return benefits[tier] || benefits.entry;
     }
 
     /**
@@ -381,10 +381,10 @@ class LoyaltyService {
      * Get tier change reason
      */
     getTierChangeReason(oldTier, newTier) {
-        if (!oldTier || oldTier === 'none') {
+        if (!oldTier || oldTier === 'entry') {
             return `Promoted to ${newTier}`;
         }
-        if (newTier === 'none' || !newTier) {
+        if (newTier === 'entry' || !newTier) {
             return `Demoted from ${oldTier}`;
         }
         const tierOrder = { bronze: 1, silver: 2, gold: 3 };

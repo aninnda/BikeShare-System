@@ -648,13 +648,13 @@ const Billing = ({ userId }) => {
 const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance, selectedRole, onRoleChange, onViewChange }) => {
     // Loyalty tier info
     const loyaltyTiers = {
-        'None': { icon: '', color: '#6c757d', perks: 'No perks' },
+        'Entry': { icon: '', color: '#6c757d', perks: 'No perks' },
         'Bronze': { icon: '', color: '#CD7F32', perks: '5% discount on trips' },
         'Silver': { icon: '', color: '#C0C0C0', perks: '10% discount on trips + 2-minute reservation hold' },
         'Gold': { icon: '', color: '#FFD700', perks: '15% discount on trips + 5-minute reservation hold' }
     };
 
-    const currentTier = loyaltyTiers[loyaltyTier] || loyaltyTiers['None'];
+    const currentTier = loyaltyTiers[loyaltyTier] || loyaltyTiers['Entry'];
     const isDualRole = userRole === 'operator' || userRole === 'dual';
 
     const badgeColor = currentTier.color;
@@ -729,7 +729,7 @@ const AccountInformation = ({ userId, userRole, loyaltyTier, flexDollarsBalance,
                         onClick={() => { if (typeof onViewChange === 'function') { onViewChange('flex-dollars-history'); } else { window.location.hash = '#flex-dollars-history'; } }}
                         style={{
                             padding: '10px 20px',
-                            backgroundColor: loyaltyTier === 'None' ? '#6c757d' : '#17a2b8',
+                            backgroundColor: loyaltyTier === 'Entry' ? '#6c757d' : '#17a2b8',
                             color: 'white',
                             border: 'none',
                             borderRadius: '4px',
@@ -1045,9 +1045,9 @@ const Profile = () => {
             const data = await response.json();
             
             if (data.success && data.loyalty && data.loyalty.currentTier) {
-                // Convert to proper casing: 'bronze' -> 'Bronze', 'none' -> 'None'
-                const tierName = data.loyalty.currentTier.toLowerCase() === 'none' 
-                    ? 'None' 
+                // Convert to proper casing: 'bronze' -> 'Bronze', 'entry' -> 'Entry'
+                const tierName = data.loyalty.currentTier.toLowerCase() === 'entry' 
+                    ? 'Entry' 
                     : data.loyalty.currentTier.charAt(0).toUpperCase() + data.loyalty.currentTier.slice(1).toLowerCase();
                 setLoyaltyTier(tierName);
             }
@@ -1059,9 +1059,9 @@ const Profile = () => {
     // Initialize loyalty tier from user context or fetch from server
     useEffect(() => {
         if (user?.loyaltyTier) {
-            // Convert to proper casing: 'bronze' -> 'Bronze', 'none' -> 'None'
-            const tierName = user.loyaltyTier.toLowerCase() === 'none' 
-                ? 'None' 
+            // Convert to proper casing: 'bronze' -> 'Bronze', 'entry' -> 'Entry'
+            const tierName = user.loyaltyTier.toLowerCase() === 'entry' 
+                ? 'Entry' 
                 : user.loyaltyTier.charAt(0).toUpperCase() + user.loyaltyTier.slice(1).toLowerCase();
             setLoyaltyTier(tierName);
         } else {
