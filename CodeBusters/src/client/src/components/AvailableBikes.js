@@ -720,7 +720,7 @@ const AvailableBikes = () => {
     );
 
     const displayStations = searchQuery.trim() ? searchResults : 
-                            allStationsLoaded ? stations.filter(s => s.availableBikes > 0) : [];
+                            allStationsLoaded ? stations.filter(s => s.totalBikes > 0) : [];
 
     return (
         <div className="available-bikes-container">

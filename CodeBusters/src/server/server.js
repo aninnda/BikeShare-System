@@ -17,6 +17,8 @@ require('dotenv').config();
 const Database = require('./config/database');
 const BMSService = require('./services/bmsService');
 const ReservationService = require('./services/reservationService');
+const FlexDollarsService = require('./src/services/flexDollarsService');
+const LoyaltyService = require('./services/loyaltyService');
 const createReservationRoutes = require('./routes/reservations');
 
 // Import BMS components for R-BMS-02 implementation
@@ -42,7 +44,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Global variables for services
-let db, bmsService, reservationService, bmsManager, configDatabaseService;
+let db, bmsService, reservationService, bmsManager, configDatabaseService, flexDollarsService,loyaltyService;
 
 // Billing calculation function
 function calculateRentalCost(startTime, endTime, bikeType) {
@@ -265,9 +267,16 @@ async function initializeApp() {
         // Initialize services
         bmsService = new BMSService(db);
         reservationService = new ReservationService(db, bmsService);
+        loyaltyService = new LoyaltyService(db);
+        
+        // Initialize Flex Dollars Service (DM-03, DM-04)
+        flexDollarsService = new FlexDollarsService(db);
         
         // Initialize BMS Manager for R-BMS-02 compliance
         bmsManager = new BMSManager();
+        
+        // Connect FlexDollarsService to BMSManager for flex dollars rewards
+        bmsManager.setFlexDollarsService(flexDollarsService);
         
         // R-BMS-01: Initialize Configuration Database Service
         configDatabaseService = new ConfigDatabaseService(db);
@@ -598,6 +607,7 @@ function setupRoutes() {
     });
 
     // Billing history for a user (riders only) - R-PRC-04 / R-PRC-05
+    // DM-03, DM-04: Include flex dollars applied information
     app.get('/api/users/:userId/billing', authenticateUser, requireRider, (req, res) => {
         const { userId } = req.params;
 
@@ -610,58 +620,100 @@ function setupRoutes() {
         const limit = req.query.limit ? parseInt(req.query.limit) : 50;
         const offset = req.query.offset ? parseInt(req.query.offset) : 0;
 
-        // Query completed rentals for user and include start/end station names and bike type
-        db.all(`
-            SELECT 
-                r.id,
-                r.bike_id,
-                r.start_time,
-                r.end_time,
-                r.total_cost,
-                r.station_id AS start_station_id,
-                s1.name AS start_station_name,
-                r.end_station_id AS end_station_id,
-                s2.name AS end_station_name,
-                b.type AS bike_type
-            FROM rentals r
-            LEFT JOIN stations s1 ON r.station_id = s1.id
-            LEFT JOIN stations s2 ON r.end_station_id = s2.id
-            LEFT JOIN r_bms_bikes b ON r.bike_id = b.id
-            WHERE r.user_id = ? AND r.status = 'completed'
-            ORDER BY r.start_time DESC
-            LIMIT ? OFFSET ?
-        `, [userId, limit, offset], (err, rows) => {
-            if (err) {
-                console.error('Error fetching billing history:', err);
-                return res.status(500).json({ success: false, message: 'Database error fetching billing history' });
+        // Ensure payments table exists for flex dollars tracking
+        db.run(`CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rental_id INTEGER,
+            user_id INTEGER,
+            amount REAL,
+            flex_dollars_applied REAL DEFAULT 0,
+            amount_due_after_flex REAL,
+            method TEXT,
+            status TEXT,
+            created_at TEXT
+        )`, (createErr) => {
+            if (createErr) {
+                console.error('Error creating payments table:', createErr);
+                // Continue anyway, table might already exist
             }
 
-            // For each rental attempt to compute deterministic breakdown using calculateRentalCost
-            const results = rows.map(row => {
-                const breakdown = row.end_time && row.start_time && row.bike_type ? calculateRentalCost(row.start_time, row.end_time, row.bike_type) : null;
+            // Query completed rentals for user and include start/end station names and flex dollars applied
+            // Note: We don't JOIN to r_bms_bikes as it may not have all bike types
+            db.all(`
+                SELECT 
+                    r.id,
+                    r.bike_id,
+                    r.start_time,
+                    r.end_time,
+                    r.total_cost,
+                    r.station_id AS start_station_id,
+                    s1.name AS start_station_name,
+                    r.end_station_id AS end_station_id,
+                    s2.name AS end_station_name,
+                    COALESCE(p.flex_dollars_applied, 0) as flex_dollars_applied,
+                    p.amount_due_after_flex,
+                    p.status as payment_status
+                FROM rentals r
+                LEFT JOIN stations s1 ON r.station_id = s1.id
+                LEFT JOIN stations s2 ON r.end_station_id = s2.id
+                LEFT JOIN payments p ON r.id = p.rental_id AND p.status = 'paid'
+                WHERE r.user_id = ? AND r.status = 'completed'
+                ORDER BY r.start_time DESC
+                LIMIT ? OFFSET ?
+            `, [userId, limit, offset], (err, rows) => {
+                if (err) {
+                    console.error('Error fetching billing history:', err);
+                    return res.status(500).json({ success: false, message: 'Database error fetching billing history', error: err.message });
+                }
 
-                return {
-                    rentalId: row.id,
-                    bikeId: row.bike_id,
-                    bikeType: row.bike_type || 'standard',
-                    startTime: row.start_time,
-                    endTime: row.end_time,
-                    originStation: {
-                        id: row.start_station_id,
-                        name: row.start_station_name || null
-                    },
-                    arrivalStation: row.end_station_id ? { id: row.end_station_id, name: row.end_station_name || null } : null,
-                    totalCost: row.total_cost != null ? Number(row.total_cost) : (breakdown ? breakdown.totalCost : null),
-                    breakdown: breakdown,
-                };
+                // For each rental attempt to compute deterministic breakdown using calculateRentalCost
+                const results = rows.map(row => {
+                    // Determine bike type from bike_id pattern
+                    const bikeIdStr = String(row.bike_id || '');
+                    const bikeIdNum = parseInt(bikeIdStr.replace('BIKE', ''));
+                    const eBikeIds = [2, 5, 7, 10, 12, 14, 17, 19, 21, 23, 24, 27, 29, 32, 34, 36, 37, 39, 42, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61, 64, 66, 68, 70, 72, 74, 76];
+                    const bikeType = eBikeIds.includes(bikeIdNum) ? 'electric' : 'standard';
+
+                    const breakdown = row.end_time && row.start_time ? calculateRentalCost(row.start_time, row.end_time, bikeType) : null;
+                    const flexDollarsApplied = Number(row.flex_dollars_applied) || 0;
+                    
+                    // If payment status is 'paid', amount due is 0, otherwise use stored value or calculate
+                    let amountDueAfterFlex;
+                    if (row.payment_status === 'paid') {
+                        amountDueAfterFlex = 0;
+                    } else if (row.amount_due_after_flex !== null && row.amount_due_after_flex !== undefined) {
+                        amountDueAfterFlex = Number(row.amount_due_after_flex);
+                    } else {
+                        amountDueAfterFlex = null;
+                    }
+
+                    return {
+                        rentalId: row.id,
+                        bikeId: row.bike_id,
+                        bikeType: bikeType,
+                        startTime: row.start_time,
+                        endTime: row.end_time,
+                        originStation: {
+                            id: row.start_station_id,
+                            name: row.start_station_name || null
+                        },
+                        arrivalStation: row.end_station_id ? { id: row.end_station_id, name: row.end_station_name || null } : null,
+                        totalCost: row.total_cost != null ? Number(row.total_cost) : (breakdown ? breakdown.totalCost : null),
+                        breakdown: breakdown,
+                        flexDollarsApplied: flexDollarsApplied,
+                        amountDueAfterFlex: amountDueAfterFlex,
+                        paymentStatus: row.payment_status || null
+                    };
+                });
+
+                res.json({ success: true, total: results.length, billing: results });
             });
-
-            res.json({ success: true, total: results.length, billing: results });
         });
     });
 
             // Payment processing stub (riders only) - lightweight interface to external payment service
-            app.post('/api/payments/charge', authenticateUser, requireRider, (req, res) => {
+            // DM-03, DM-04: Automatically applies flex dollars to rental charges
+            app.post('/api/payments/charge', authenticateUser, requireRider, async (req, res) => {
                 const { rentalId, method = 'card' } = req.body;
                 const headerUserId = req.user && req.user.id ? String(req.user.id) : null;
 
@@ -675,13 +727,17 @@ function setupRoutes() {
                     rental_id INTEGER,
                     user_id INTEGER,
                     amount REAL,
+                    flex_dollars_applied REAL DEFAULT 0,
+                    amount_due_after_flex REAL,
+                    discount_amount REAL DEFAULT 0,
+                    discount_percentage INTEGER DEFAULT 0,
                     method TEXT,
                     status TEXT,
                     created_at TEXT
                 )`);
 
                 // Lookup rental
-                db.get('SELECT * FROM rentals WHERE id = ?', [rentalId], (err, rental) => {
+                db.get('SELECT * FROM rentals WHERE id = ?', [rentalId], async (err, rental) => {
                     if (err) {
                         console.error('Error looking up rental for payment:', err);
                         return res.status(500).json({ success: false, message: 'Database error' });
@@ -699,45 +755,134 @@ function setupRoutes() {
                         return res.status(400).json({ success: false, message: 'Only completed rentals can be charged' });
                     }
 
-                    const amount = Number(rental.total_cost || 0);
+                    const totalCost = Number(rental.total_cost || 0);
+                    let amount = Number(rental.total_cost || 0);
+                    let discountAmount = 0;
+                    let discountPercentage = 0;
 
-                    if (amount <= 0) {
+                    if (totalCost <= 0) {
                         return res.status(400).json({ success: false, message: 'Nothing to charge for this rental' });
                     }
 
                     // Check for existing paid payment
-                    db.get('SELECT * FROM payments WHERE rental_id = ? AND status = ?', [rentalId, 'paid'], (pErr, existingPayment) => {
+                    db.get('SELECT * FROM payments WHERE rental_id = ? AND status = ?', [rentalId, 'paid'], async (pErr, existingPayment) => {
                         if (pErr) {
                             console.error('Error checking existing payments:', pErr);
                             return res.status(500).json({ success: false, message: 'Database error' });
                         }
 
                         if (existingPayment) {
-                            return res.json({ success: true, message: 'Rental already paid', payment: existingPayment });
+                            return res.json({ 
+                                success: true, 
+                                message: 'Rental already paid', 
+                                payment: existingPayment,
+                                flexDollarsApplied: existingPayment.flex_dollars_applied || 0
+                            });
                         }
 
-                        // Simulate external payment gateway call (synchronous stub for now)
-                        const payment = {
-                            rental_id: rentalId,
-                            user_id: rental.user_id,
-                            amount: amount,
-                            method: method,
-                            status: 'paid',
-                            created_at: new Date().toISOString()
-                        };
+                        // DM-03, DM-04: Apply flex dollars to this rental charge
+                        try {
+                            const flexResult = await flexDollarsService.deductFlexDollars(
+                                rental.user_id,
+                                totalCost,
+                                `Payment for rental #${rentalId}`,
+                                rentalId
+                            );
 
-                        db.run('INSERT INTO payments (rental_id, user_id, amount, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-                            [payment.rental_id, payment.user_id, payment.amount, payment.method, payment.status, payment.created_at], function(insertErr) {
-                                if (insertErr) {
-                                    console.error('Error recording payment:', insertErr);
-                                    return res.status(500).json({ success: false, message: 'Failed to record payment' });
+                            const flexDollarsApplied = flexResult.amountDeducted;
+                            const amountDueAfterFlex = flexResult.remainingBalance;
+
+                            console.log(`[PaymentRoute] flexResult for rental=${rentalId}:`, flexResult);
+                            console.log(`[PaymentRoute] computed flexDollarsApplied=${Number(flexDollarsApplied).toFixed(2)} amountDueAfterFlex=${Number(amountDueAfterFlex).toFixed(2)} totalCost=${totalCost.toFixed(2)}`);
+
+                            // Simulate external payment gateway call for remaining balance only
+                            const payment = {
+                                rental_id: rentalId,
+                                user_id: rental.user_id,
+                                amount: totalCost,
+                                flex_dollars_applied: flexDollarsApplied,
+                                amount_due_after_flex: amountDueAfterFlex,
+                                method: amountDueAfterFlex > 0 ? method : 'flex_dollars', // Method is flex_dollars if fully paid by flex
+                                status: 'paid',
+                                created_at: new Date().toISOString()
+                            };
+
+                            console.log('[PaymentRoute] payment object before DB insert:', payment);
+
+                            db.run('INSERT INTO payments (rental_id, user_id, amount, flex_dollars_applied, amount_due_after_flex, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                [payment.rental_id, payment.user_id, payment.amount, payment.flex_dollars_applied, payment.amount_due_after_flex, payment.method, payment.status, payment.created_at], 
+                                function(insertErr) {
+                                    if (insertErr) {
+                                        console.error('Error recording payment:', insertErr);
+                                        return res.status(500).json({ success: false, message: 'Failed to record payment' });
+                                    }
+
+                                    payment.id = this.lastID;
+                                    
+                                    let message = 'Payment processed successfully';
+                                    if (flexDollarsApplied > 0) {
+                                        message += ` - Applied $${flexDollarsApplied.toFixed(2)} flex dollars`;
+                                        if (amountDueAfterFlex > 0) {
+                                            message += ` - $${amountDueAfterFlex.toFixed(2)} charged to ${method}`;
+                                        } else {
+                                            message += ` - Fully paid with flex dollars!`;
+                                        }
+                                    }
+                                    
+                                    return res.json({ 
+                                        success: true, 
+                                        message: message, 
+                                        payment: {
+                                            id: payment.id,
+                                            rentalId: payment.rental_id,
+                                            totalCost: payment.amount,
+                                            flexDollarsApplied: payment.flex_dollars_applied,
+                                            amountDue: payment.amount_due_after_flex,
+                                            method: payment.method,
+                                            status: payment.status
+                                        }
+                                    });
                                 }
+                            );
+                        } catch (flexError) {
+                            console.error('Error applying flex dollars:', flexError);
+                            // If flex dollars fails, fall back to regular payment
+                            const payment = {
+                                rental_id: rentalId,
+                                user_id: rental.user_id,
+                                amount: totalCost,
+                                flex_dollars_applied: 0,
+                                amount_due_after_flex: totalCost,
+                                method: method,
+                                status: 'paid',
+                                created_at: new Date().toISOString()
+                            };
 
-                                payment.id = this.lastID;
-                                // Return payment record
-                                return res.json({ success: true, message: 'Payment processed (stub)', payment });
-                            }
-                        );
+                            db.run('INSERT INTO payments (rental_id, user_id, amount, flex_dollars_applied, amount_due_after_flex, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                                [payment.rental_id, payment.user_id, payment.amount, payment.flex_dollars_applied, payment.amount_due_after_flex, payment.method, payment.status, payment.created_at], 
+                                function(insertErr) {
+                                    if (insertErr) {
+                                        console.error('Error recording payment:', insertErr);
+                                        return res.status(500).json({ success: false, message: 'Failed to record payment' });
+                                    }
+
+                                    payment.id = this.lastID;
+                                    return res.json({ 
+                                        success: true, 
+                                        message: `Payment processed (flex dollars unavailable) - $${totalCost.toFixed(2)} charged to ${method}`, 
+                                        payment: {
+                                            id: payment.id,
+                                            rentalId: payment.rental_id,
+                                            totalCost: payment.amount,
+                                            flexDollarsApplied: 0,
+                                            amountDue: totalCost,
+                                            method: payment.method,
+                                            status: payment.status
+                                        }
+                                    });
+                                }
+                            );
+                        }
                     });
                 });
             });
@@ -1087,7 +1232,7 @@ function setupRoutes() {
                 const durationMinutes = Math.max(1, Math.ceil(durationMs / (1000 * 60)));
                 
                 // Determine bike type from ID
-                const bikeIdNum = parseInt(row.bike_id.replace('BIKE', ''));
+                const bikeIdNum = parseInt(String(row.bike_id).replace('BIKE', ''));
                 const eBikeIds = [2, 5, 7, 10, 12, 14, 17, 19, 21, 23, 24, 27, 29, 32, 34, 36, 37, 39, 42, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61, 64, 66, 68, 70, 72, 74, 76];
                 const bikeType = eBikeIds.includes(bikeIdNum) ? 'electric' : 'standard';
                 const cost = row.total_cost || 0;
@@ -1294,6 +1439,113 @@ function setupRoutes() {
         });
     });
 
+    // Get user's loyalty tier and benefits
+    app.get('/api/users/:userId/loyalty', authenticateUser, requireRider, async (req, res) => {
+        try {
+            const { userId } = req.params;
+            const headerUserId = req.user && req.user.id ? String(req.user.id) : null;
+
+            // Verify user is accessing their own loyalty info
+            if (String(userId) !== headerUserId) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Riders can only view their own loyalty information'
+                });
+            }
+
+            if (!loyaltyService) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Loyalty service not initialized'
+                });
+            }
+
+            // Get user's current tier
+            let user;
+            try {
+                user = await loyaltyService.getUserData(userId);
+            } catch (dbError) {
+                console.error('Database error getting user:', dbError);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Database error retrieving user information'
+                });
+            }
+
+            if (!user) {
+                return res.status(404).json({
+                    success: false,
+                    message: 'User not found'
+                });
+            }
+
+            const currentTier = user.loyalty_tier || 'entry';
+            const tierBenefits = loyaltyService.getTierBenefits(currentTier);
+
+            // Get loyalty history - gracefully handle if no history exists
+            let history = [];
+            try {
+                history = await loyaltyService.getLoyaltyHistory(userId, 5);
+            } catch (historyError) {
+                console.error('Error fetching loyalty history:', historyError);
+                // Don't fail - just return empty history
+                history = [];
+            }
+
+            res.json({
+                success: true,
+                loyalty: {
+                    currentTier,
+                    benefits: {
+                        discountPercentage: tierBenefits.discountPercentage,
+                        reservationExtensionMinutes: tierBenefits.reservationExtensionMinutes
+                    },
+                    tierDescriptions: {
+                        bronze: { discount: 5, extension: 0, name: 'Bronze' },
+                        silver: { discount: 10, extension: 2, name: 'Silver' },
+                        gold: { discount: 15, extension: 5, name: 'Gold' }
+                    }
+                },
+                history
+            });
+        } catch (error) {
+            console.error('Error fetching loyalty information:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error fetching loyalty information'
+            });
+        }
+    });
+
+    // Get leaderboard - riders ranked by number of trips
+    app.get('/api/leaderboard', (req, res) => {
+        db.all(`
+            SELECT 
+                u.id as user_id,
+                u.username,
+                COUNT(r.id) as trip_count
+            FROM users u
+            LEFT JOIN rentals r ON u.id = r.user_id AND r.status = 'completed'
+            WHERE u.role IN ('rider', 'dual')
+            GROUP BY u.id, u.username
+            ORDER BY trip_count DESC, u.username ASC
+        `, (err, rows) => {
+            if (err) {
+                console.error('Error fetching leaderboard:', err);
+                res.status(500).json({ error: err.message });
+                return;
+            }
+            console.log('Leaderboard query result:', rows);
+            // Add rank based on position in result set
+            const leaderboardWithRanks = rows ? rows.map((row, index) => ({
+                ...row,
+                rank: index + 1
+            })) : [];
+            console.log('Leaderboard with ranks:', leaderboardWithRanks);
+            res.json({ leaderboard: leaderboardWithRanks });
+        });
+    });
+
     // Add a new bike (operator only)
     app.post('/api/bikes', authenticateUser, requireOperator, (req, res) => {
         const { bike_id, model, location, battery_level } = req.body;
@@ -1332,6 +1584,193 @@ function setupRoutes() {
                     success: true,
                     message: 'Bike added successfully',
                     bike: { id: bike_id, model, location, battery_level, status: 'available' }
+                });
+            }
+        );
+    });
+
+    // Report bike damage (riders can report, sets status to maintenance)
+    app.post('/api/bikes/:id/report-damage', authenticateUser, (req, res) => {
+        const bikeId = req.params.id;
+        const { description } = req.body;
+        const userId = req.headers['x-user-id'];
+        const username = req.headers['x-username'];
+        
+        // First, check if user has an active rental with this bike
+        db.get('SELECT * FROM rentals WHERE bike_id = ? AND user_id = ? AND status = ?', 
+            [bikeId, userId, 'active'], 
+            (rentalErr, rental) => {
+                if (rentalErr) {
+                    console.error('Error checking rental:', rentalErr.message);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Database error' 
+                    });
+                }
+
+                if (!rental) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'You can only report damage for bikes you are currently renting' 
+                    });
+                }
+
+                const rentalStationId = rental.station_id; // Station where bike was originally rented
+
+                // Create notifications table if it doesn't exist
+                db.run(`CREATE TABLE IF NOT EXISTS operator_notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type TEXT NOT NULL,
+                    bike_id TEXT,
+                    station_id TEXT,
+                    user_id INTEGER,
+                    username TEXT,
+                    message TEXT NOT NULL,
+                    read INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )`, (notifTableErr) => {
+                    if (notifTableErr) {
+                        console.error('Error creating notifications table:', notifTableErr.message);
+                    }
+                });
+
+                // Create damage_reports table if it doesn't exist
+                db.run(`CREATE TABLE IF NOT EXISTS damage_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bike_id TEXT NOT NULL,
+                    station_id TEXT NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    username TEXT,
+                    description TEXT,
+                    status TEXT DEFAULT 'pending',
+                    reported_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    resolved_at DATETIME
+                )`, (createErr) => {
+                    if (createErr) {
+                        console.error('Error creating damage_reports table:', createErr.message);
+                        return res.status(500).json({ 
+                            success: false, 
+                            message: 'Database error' 
+                        });
+                    }
+
+                    // Get station name for better reporting
+                    db.get('SELECT name FROM stations WHERE id = ?', [rentalStationId], (stationErr, station) => {
+                        const stationName = station ? station.name : rentalStationId;
+
+                        // Insert damage report
+                        db.run(
+                            'INSERT INTO damage_reports (bike_id, station_id, user_id, username, description) VALUES (?, ?, ?, ?, ?)',
+                            [bikeId, rentalStationId, userId, username, description || 'Bike damage reported'],
+                            function(insertErr) {
+                                if (insertErr) {
+                                    console.error('Error inserting damage report:', insertErr.message);
+                                    return res.status(500).json({ 
+                                        success: false, 
+                                        message: 'Failed to submit damage report' 
+                                    });
+                                }
+
+                                const reportId = this.lastID;
+
+                                // End the active rental immediately due to damage report
+                                const endTime = new Date().toISOString();
+                                const startTime = new Date(rental.start_time);
+                                const duration = Math.ceil((new Date(endTime) - startTime) / (1000 * 60)); // in minutes
+                                
+                                // Calculate cost
+                                const bikeIdNum = parseInt(bikeId.replace('BIKE', ''));
+                                const eBikeIds = [2, 5, 7, 10, 12, 14, 17, 19, 21, 23, 24, 27, 29, 32, 34, 36, 37, 39, 42, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61, 64, 66, 68, 70, 72, 74, 76];
+                                const bikeType = eBikeIds.includes(bikeIdNum) ? 'e-bike' : 'standard';
+                                const ratePerMinute = bikeType === 'e-bike' ? 0.25 : 0.10;
+                                const totalCost = Math.round(duration * ratePerMinute * 100) / 100;
+
+                                // Update rental to completed
+                                db.run(
+                                    'UPDATE rentals SET status = ?, end_time = ?, total_cost = ? WHERE id = ?',
+                                    ['completed', endTime, totalCost, rental.id],
+                                    function(rentalUpdateErr) {
+                                        if (rentalUpdateErr) {
+                                            console.error('Error ending rental:', rentalUpdateErr.message);
+                                            // Continue anyway - damage report is more important
+                                        } else {
+                                            console.log(`✓ Rental #${rental.id} ended due to damage report. Duration: ${duration} min, Cost: $${totalCost.toFixed(2)}`);
+                                        }
+
+                                        // Update bike status to maintenance
+                                        db.run(
+                                            'UPDATE r_bms_bikes SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                                            ['maintenance', bikeId],
+                                            function(updateErr) {
+                                                if (updateErr) {
+                                                    console.error('Error updating bike status:', updateErr.message);
+                                                    return res.status(500).json({ 
+                                                        success: false, 
+                                                        message: 'Damage report saved but failed to update bike status' 
+                                                    });
+                                                }
+                                                
+                                                // If bike wasn't in database (shouldn't happen but just in case), insert it
+                                                if (this.changes === 0) {
+                                                    db.run(
+                                                        'INSERT INTO r_bms_bikes (id, type, station_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
+                                                        [bikeId, bikeType, rentalStationId, 'maintenance'],
+                                                        function(insertBikeErr) {
+                                                            if (insertBikeErr) {
+                                                                console.error('Error inserting bike:', insertBikeErr.message);
+                                                            }
+                                                        }
+                                                    );
+                                                }
+                                                
+                                                // Update BMSManager in-memory state
+                                                try {
+                                                    const bike = bmsManager.bikes.get(bikeId);
+                                                    if (bike) {
+                                                        bike.status = 'maintenance';
+                                                        console.log(`BMS updated: Bike ${bikeId} marked for maintenance due to damage report`);
+                                                    }
+                                                } catch (bmsError) {
+                                                    console.error('Error updating bike in BMS:', bmsError.message);
+                                                }
+                                                
+                                                // Update station status
+                                                updateStationStatus(rentalStationId);
+                                                
+                                                // Create notification for operators
+                                                const notificationMessage = ` DAMAGE REPORT: Bike ${bikeId} at ${stationName}. Rental ended automatically. Reported by ${username}. Description: ${description || 'No details provided'}. Cost: $${totalCost.toFixed(2)}`;
+                                                
+                                                db.run(
+                                                    'INSERT INTO operator_notifications (type, bike_id, station_id, user_id, username, message) VALUES (?, ?, ?, ?, ?, ?)',
+                                                    ['damage_report', bikeId, rentalStationId, userId, username, notificationMessage],
+                                                    function(notifErr) {
+                                                        if (notifErr) {
+                                                            console.error('Error creating operator notification:', notifErr.message);
+                                                        }
+                                                        
+                                                        console.log(`✓ Damage report #${reportId} created for bike ${bikeId} at ${rentalStationId} by user ${username}`);
+                                                        
+                                                        res.json({
+                                                            success: true,
+                                                            message: `Damage report submitted successfully. Your rental has ended automatically. Bike ${bikeId} has been marked as NOT AVAILABLE and will remain at ${stationName} for inspection. Operators have been notified.`,
+                                                            reportId: reportId,
+                                                            bikeId: bikeId,
+                                                            stationId: rentalStationId,
+                                                            stationName: stationName,
+                                                            status: 'maintenance',
+                                                            rentalEnded: true,
+                                                            duration: duration,
+                                                            totalCost: totalCost
+                                                        });
+                                                    }
+                                                );
+                                            }
+                                        );
+                                    }
+                                );
+                            }
+                        );
+                    });
                 });
             }
         );
@@ -1405,6 +1844,123 @@ function setupRoutes() {
         );
     });
 
+    // Get operator notifications (damage reports, etc.)
+    app.get('/api/operator/notifications', authenticateUser, requireOperator, (req, res) => {
+        const unreadOnly = req.query.unread === 'true';
+        
+        let query = 'SELECT * FROM operator_notifications';
+        if (unreadOnly) {
+            query += ' WHERE read = 0';
+        }
+        query += ' ORDER BY created_at DESC LIMIT 100';
+        
+        db.all(query, [], (err, notifications) => {
+            if (err) {
+                console.error('Error fetching notifications:', err.message);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Database error' 
+                });
+            }
+            
+            res.json({
+                success: true,
+                notifications: notifications || [],
+                count: notifications ? notifications.length : 0
+            });
+        });
+    });
+
+    // Mark notification as read
+    app.put('/api/operator/notifications/:id/read', authenticateUser, requireOperator, (req, res) => {
+        const notificationId = req.params.id;
+        
+        db.run(
+            'UPDATE operator_notifications SET read = 1 WHERE id = ?',
+            [notificationId],
+            function(err) {
+                if (err) {
+                    console.error('Error marking notification as read:', err.message);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Database error' 
+                    });
+                }
+                
+                res.json({
+                    success: true,
+                    message: 'Notification marked as read'
+                });
+            }
+        );
+    });
+
+    // Get all damage reports
+    app.get('/api/operator/damage-reports', authenticateUser, requireOperator, (req, res) => {
+        const status = req.query.status; // pending, resolved, or all
+        
+        let query = `
+            SELECT dr.*, s.name as station_name 
+            FROM damage_reports dr
+            LEFT JOIN stations s ON dr.station_id = s.id
+        `;
+        
+        if (status && status !== 'all') {
+            query += ' WHERE dr.status = ?';
+        }
+        
+        query += ' ORDER BY dr.reported_at DESC';
+        
+        const params = status && status !== 'all' ? [status] : [];
+        
+        db.all(query, params, (err, reports) => {
+            if (err) {
+                console.error('Error fetching damage reports:', err.message);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Database error' 
+                });
+            }
+            
+            res.json({
+                success: true,
+                reports: reports || [],
+                count: reports ? reports.length : 0
+            });
+        });
+    });
+
+    // Resolve a damage report
+    app.put('/api/operator/damage-reports/:id/resolve', authenticateUser, requireOperator, (req, res) => {
+        const reportId = req.params.id;
+        
+        db.run(
+            'UPDATE damage_reports SET status = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?',
+            ['resolved', reportId],
+            function(err) {
+                if (err) {
+                    console.error('Error resolving damage report:', err.message);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Database error' 
+                    });
+                }
+                
+                if (this.changes === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Damage report not found'
+                    });
+                }
+                
+                res.json({
+                    success: true,
+                    message: 'Damage report marked as resolved'
+                });
+            }
+        );
+    });
+
     // Create a demo operator with hardcoded information
     app.get('/api/create-demo-operator', (req, res) => {
         const demoUser = {
@@ -1459,8 +2015,8 @@ function setupRoutes() {
 
                 // Insert demo user
                 db.run(
-                    'INSERT INTO users (username, password, first_name, last_name, email, address, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [demoUser.username, demoUser.password, demoUser.firstName, demoUser.lastName, demoUser.email, demoUser.address, demoUser.role],
+                    'INSERT INTO users (username, password, first_name, last_name, email, address, role, loyalty_tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [demoUser.username, demoUser.password, demoUser.firstName, demoUser.lastName, demoUser.email, demoUser.address, demoUser.role, 'entry'],
                     function(insertErr) {
                         if (insertErr) {
                             console.error('Error creating demo user:', insertErr.message);
@@ -1491,7 +2047,8 @@ function setupRoutes() {
 
     // Authentication endpoints (keep existing)
     app.post('/api/register', (req, res) => {
-        const { username, password, firstName, lastName, email, address, role = 'rider' } = req.body;
+        const { username, password, firstName, lastName, email, address, role = 'rider', 
+                cardNumber, expiryDate, cvcCode, cardHolderName } = req.body;
         
         if (!username || !password || !firstName || !lastName || !email) {
             return res.status(400).json({ 
@@ -1509,9 +2066,43 @@ function setupRoutes() {
             });
         }
         
+        // Validate card information if provided
+        if (cardNumber || expiryDate || cvcCode || cardHolderName) {
+            if (!cardNumber || !expiryDate || !cvcCode || !cardHolderName) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'All card information fields are required' 
+                });
+            }
+            
+            // Validate card number (must be 16 digits)
+            if (cardNumber.length !== 16 || !/^\d+$/.test(cardNumber)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid card number' 
+                });
+            }
+            
+            // Validate expiry date format (MM/YY)
+            if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiryDate)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid expiry date format' 
+                });
+            }
+            
+            // Validate CVC (must be 3 digits)
+            if (cvcCode.length !== 3 || !/^\d+$/.test(cvcCode)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'Invalid CVC code' 
+                });
+            }
+        }
+        
         db.run(
-            'INSERT INTO users (username, password, first_name, last_name, email, address, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [username, password, firstName, lastName, email, address, role],
+            'INSERT INTO users (username, password, first_name, last_name, email, address, role, loyalty_tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [username, password, firstName, lastName, email, address, role, 'entry'],
             function(err) {
                 if (err) {
                     if (err.message.includes('UNIQUE constraint failed')) {
@@ -1527,11 +2118,31 @@ function setupRoutes() {
                     });
                 }
                 
+                const userId = this.lastID;
+                
+                // If card information is provided, save it
+                if (cardNumber && expiryDate && cardHolderName) {
+                    // Store only last 4 digits of card number for security
+                    const last4Digits = cardNumber.slice(-4);
+                    
+                    db.run(
+                        'INSERT INTO payment_methods (user_id, card_number_last4, card_holder_name, expiry_date, is_default) VALUES (?, ?, ?, ?, 1)',
+                        [userId, last4Digits, cardHolderName, expiryDate],
+                        function(cardErr) {
+                            if (cardErr) {
+                                console.error('Error saving card information:', cardErr.message);
+                                // Don't fail registration if card save fails
+                                // User can add card later
+                            }
+                        }
+                    );
+                }
+                
                 res.json({
                     success: true,
                     message: 'User registered successfully',
                     user: { 
-                        id: this.lastID, 
+                        id: userId, 
                         username: username, 
                         firstName: firstName,
                         lastName: lastName,
@@ -1544,7 +2155,42 @@ function setupRoutes() {
         );
     });
 
-    app.post('/api/login', (req, res) => {
+    // Get payment method for a user
+    app.get('/api/payment-methods/:userId', (req, res) => {
+        const { userId } = req.params;
+        
+        console.log(`[PaymentMethod] Fetching for userId: ${userId} (type: ${typeof userId})`);
+        
+        db.get(
+            'SELECT id, card_number_last4, card_holder_name, expiry_date, is_default, created_at FROM payment_methods WHERE user_id = ? AND is_default = 1',
+            [userId],
+            (err, row) => {
+                if (err) {
+                    console.error('Database error:', err.message);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Internal server error' 
+                    });
+                }
+                
+                console.log(`[PaymentMethod] Found row:`, row);
+                
+                if (row) {
+                    res.json({
+                        success: true,
+                        paymentMethod: row
+                    });
+                } else {
+                    res.json({
+                        success: true,
+                        paymentMethod: null
+                    });
+                }
+            }
+        );
+    });
+
+    app.post('/api/login', async (req, res) => {
         const { username, password } = req.body;
         
         if (!username || !password) {
@@ -1555,9 +2201,9 @@ function setupRoutes() {
         }
         
         db.get(
-            'SELECT id, username, role, first_name, last_name, email, address FROM users WHERE username = ? AND password = ?',
+            'SELECT id, username, role, first_name, last_name, email, address, loyalty_tier FROM users WHERE username = ? AND password = ?',
             [username, password],
-            (err, row) => {
+            async (err, row) => {
                 if (err) {
                     console.error('Database error:', err.message);
                     return res.status(500).json({ 
@@ -1573,6 +2219,39 @@ function setupRoutes() {
                         console.error('Error cleaning up orphaned reservations:', error);
                     });
                     
+                    // For riders, check and update loyalty tier
+                    let tierNotification = null;
+                    if (row.role === 'rider' && loyaltyService) {
+                        try {
+                            const currentTier = row.loyalty_tier || 'entry';
+                            const newTier = await loyaltyService.calculateUserTier(row.id);
+                            const tierUpdateResult = await loyaltyService.updateUserTier(row.id, newTier);
+                            
+                            console.log(`[Login Tier Check] User ${row.id} - Current: ${currentTier}, New: ${newTier}, Changed: ${tierUpdateResult.tierChanged}`);
+                            
+                            if (tierUpdateResult.tierChanged) {
+                                // Determine if it's a promotion or demotion
+                                const tierOrder = { 'entry': 0, 'bronze': 1, 'silver': 2, 'gold': 3 };
+                                const oldRank = tierOrder[tierUpdateResult.oldTier] || 0;
+                                const newRank = tierOrder[tierUpdateResult.newTier] || 0;
+                                const isPromotion = newRank > oldRank;
+                                
+                                tierNotification = {
+                                    type: isPromotion ? 'promotion' : 'demotion',
+                                    oldTier: tierUpdateResult.oldTier,
+                                    newTier: tierUpdateResult.newTier,
+                                    message: tierUpdateResult.reason
+                                };
+                                console.log(`[Login Tier Check] Tier notification created:`, tierNotification);
+                            }
+                            
+                            // Include current tier in response
+                            row.loyalty_tier = newTier;
+                        } catch (error) {
+                            console.error('Error checking loyalty tier:', error);
+                        }
+                    }
+                    
                     res.json({
                         success: true,
                         message: 'Login successful',
@@ -1583,9 +2262,15 @@ function setupRoutes() {
                             lastName: row.last_name,
                             email: row.email,
                             address: row.address,
-                            role: row.role
-                        }
+                            role: row.role,
+                            loyaltyTier: row.loyalty_tier || 'entry'
+                        },
+                        tierNotification: tierNotification || null
                     });
+                    
+                    if (tierNotification) {
+                        console.log(`[Login Response] Sending tier notification to client:`, tierNotification);
+                    }
                 } else {
                     res.status(401).json({
                         success: false,
@@ -1778,13 +2463,45 @@ function setupRoutes() {
                     maintenanceBikesCount: maintenanceBikes.length,
                     onTripBikesCount: 0, // on_trip bikes don't have station_id, so 0 here
                     
+                    // Grouped bikes for easier client consumption
+                    availableBikes: {
+                        count: availableBikes.length,
+                        bikes: availableBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status,
+                            reservationExpiry: bike.reservation_expiry || null
+                        }))
+                    },
+                    reservedBikes: {
+                        count: reservedBikes.length,
+                        bikes: reservedBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status,
+                            reservationExpiry: bike.reservation_expiry || null
+                        }))
+                    },
+                    maintenanceBikes: {
+                        count: maintenanceBikes.length,
+                        bikes: maintenanceBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status
+                        }))
+                    },
+                    
                     // Bike type breakdowns (for ALL bikes at station)
                     totalStandardBikes: bikesList.filter(bike => bike.type === 'standard').length,
                     totalEBikes: bikesList.filter(bike => bike.type === 'e-bike').length,
+                    totalBikes: bikesList.length,
                     
                     // Docked bike type breakdowns (excludes maintenance)
                     dockedStandardBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'standard').length,
-                    dockedEBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'e-bike').length
+                    dockedEBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'e-bike').length,
+                    
+                    // Summary text
+                    summary: `${availableBikes.length} available • ${reservedBikes.length} reserved • ${maintenanceBikes.length} in maintenance`
                 };
             }));
             
@@ -2107,68 +2824,81 @@ function setupRoutes() {
                                 });
                             }
 
-                            // Calculate reservation expiry (15 minutes default)
-                            const reservationHoldMinutes = 15;
-                            const expiryTime = new Date();
-                            expiryTime.setMinutes(expiryTime.getMinutes() + reservationHoldMinutes);
-
-                            // Reserve the bike
-                            db.run(
-                                `UPDATE r_bms_bikes 
-                                 SET status = 'reserved', 
-                                     reserved_by_user_id = ?, 
-                                     reservation_expiry = ?,
-                                     updated_at = CURRENT_TIMESTAMP
-                                 WHERE id = ? AND station_id = ?`,
-                                [userId, expiryTime.toISOString(), bikeId, stationId],
-                                function(updateErr) {
-                                    if (updateErr) {
-                                        console.error('Error reserving bike:', updateErr);
-                                        return res.status(500).json({
-                                            success: false,
-                                            message: 'Failed to reserve bike'
-                                        });
+                            // Calculate reservation expiry based on loyalty tier
+                            let reservationHoldMinutes = 15; // Default
+                            
+                            // Get user's loyalty tier for extension bonus
+                            db.get('SELECT loyalty_tier FROM users WHERE id = ?', [userId], (tierErr, tierUser) => {
+                                if (!tierErr && tierUser && loyaltyService) {
+                                    try {
+                                        const tierBenefits = loyaltyService.getTierBenefits(tierUser.loyalty_tier || 'entry');
+                                        reservationHoldMinutes += tierBenefits.reservationExtensionMinutes;
+                                    } catch (error) {
+                                        console.error('Error applying loyalty extension:', error);
                                     }
+                                }
 
-                                    // Get station name for response
-                                    db.get(
-                                        'SELECT name FROM stations WHERE id = ?',
-                                        [stationId],
-                                        (stationErr, station) => {
-                                            const stationName = station ? station.name : 'Unknown Station';
-                                            
-                                            console.log(`Bike ${bikeId} reserved by user ${userId} at station ${stationId}`);
-                                            
-                                            // Log reservation activity
-                                            logUserActivity(userId, 'reservation', bikeId, stationId, {
-                                                bike_type: bike.type === 'electric' ? '⚡ E-Bike' : '🚴 Standard',
-                                                station_name: stationName,
-                                                expires_at: expiryTime.toISOString()
-                                            });
-                                            
-                                            res.json({
-                                                success: true,
-                                                message: 'Bike reserved successfully',
-                                                reservation: {
-                                                    bikeId: bikeId,
-                                                    bikeType: bike.type,
-                                                    stationId: stationId,
-                                                    stationName: stationName,
-                                                    reservedAt: new Date().toISOString(),
-                                                    expiresAt: expiryTime.toISOString(),
-                                                    holdTimeMinutes: reservationHoldMinutes,
-                                                    userId: userId
-                                                }
+                                const expiryTime = new Date();
+                                expiryTime.setMinutes(expiryTime.getMinutes() + reservationHoldMinutes);
+
+                                // Reserve the bike
+                                db.run(
+                                    `UPDATE r_bms_bikes 
+                                     SET status = 'reserved', 
+                                         reserved_by_user_id = ?, 
+                                         reservation_expiry = ?,
+                                         updated_at = CURRENT_TIMESTAMP
+                                     WHERE id = ? AND station_id = ?`,
+                                    [userId, expiryTime.toISOString(), bikeId, stationId],
+                                    function(updateErr) {
+                                        if (updateErr) {
+                                            console.error('Error reserving bike:', updateErr);
+                                            return res.status(500).json({
+                                                success: false,
+                                                message: 'Failed to reserve bike'
                                             });
                                         }
-                                    );
-                                }
-                            );
-                        }
-                    );
-                }
-            );
-            
+
+                                        // Get station name for response
+                                        db.get(
+                                            'SELECT name FROM stations WHERE id = ?',
+                                            [stationId],
+                                            (stationErr, station) => {
+                                                const stationName = station ? station.name : 'Unknown Station';
+                                                
+                                                console.log(`Bike ${bikeId} reserved by user ${userId} at station ${stationId}`);
+                                                
+                                                // Log reservation activity
+                                                logUserActivity(userId, 'reservation', bikeId, stationId, {
+                                                    bike_type: bike.type === 'electric' ? '⚡ E-Bike' : '🚴 Standard',
+                                                    station_name: stationName,
+                                                    expires_at: expiryTime.toISOString()
+                                                });
+                                                
+                                                res.json({
+                                                    success: true,
+                                                    message: 'Bike reserved successfully',
+                                                    reservation: {
+                                                        bikeId: bikeId,
+                                                        bikeType: bike.type,
+                                                        stationId: stationId,
+                                                        stationName: stationName,
+                                                        reservedAt: new Date().toISOString(),
+                                                        expiresAt: expiryTime.toISOString(),
+                                                        holdTimeMinutes: reservationHoldMinutes,
+                                                        userId: userId
+                                                    }
+                                                });
+                                            }
+                                        );
+                                    }
+                                );
+                            }
+                        );
+                    }
+                );
+            }
+        );
         } catch (error) {
             console.error('Error reserving bike:', error);
             res.status(500).json({
@@ -2668,6 +3398,32 @@ function setupRoutes() {
     });
 
     // Health check
+    // Loyalty tier maintenance endpoint (for periodic checks)
+    app.post('/api/loyalty/check-all', authenticateUser, requireOperator, async (req, res) => {
+        try {
+            if (!loyaltyService) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Loyalty service not initialized'
+                });
+            }
+
+            const result = await loyaltyService.checkAllUsersTiers();
+            
+            res.json({
+                success: true,
+                message: 'Loyalty tier check completed',
+                result
+            });
+        } catch (error) {
+            console.error('Error checking loyalty tiers:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Error checking loyalty tiers'
+            });
+        }
+    });
+
     app.get('/health', (req, res) => {
         res.json({ status: 'OK', timestamp: new Date().toISOString() });
     });
@@ -2851,7 +3607,7 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                             db.run(
                                 'UPDATE r_bms_bikes SET status = ?, station_id = ? WHERE id = ?',
                                 ['available', stationId, bikeId],
-                                function(updateErr) {
+                                async function(updateErr) {
                                     if (updateErr) {
                                         console.error('Error updating bike status:', updateErr);
                                         return resolve({
@@ -2861,6 +3617,48 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                                     }
 
                                     // --- Update in-memory bmsManager state ---
+                                    // Also check for flex dollars eligibility (DM-03, DM-04)
+                                    let flexDollarsAwarded = null;
+                                    if (bmsManager && bmsManager.stations && bmsManager.bikes) {
+                                        const station = bmsManager.stations.get(stationId);
+                                        const bikeMem = bmsManager.bikes.get(bikeId);
+                                        if (station && bikeMem) {
+                                            station.dockedBikes.set(bikeId, bikeMem);
+                                            bikeMem.status = 'available';
+                                            
+                                            // Check if station is below 25% occupancy after return
+                                            if (flexDollarsService) {
+                                                const stationInfo = station.getStationInfo();
+                                                const occupiedDocks = stationInfo.numberOfBikesDocked;
+                                                const totalCapacity = stationInfo.capacity;
+                                                
+                                                if (flexDollarsService.isBelowMinimumOccupancy(occupiedDocks, totalCapacity)) {
+                                                    try {
+                                                        const rewardAmount = flexDollarsService.getRewardAmount();
+                                                        const awardResult = await flexDollarsService.awardFlexDollars(
+                                                            userId,
+                                                            rewardAmount,
+                                                            `Bike returned to ${station.name} (${occupiedDocks}/${totalCapacity} capacity)`,
+                                                            null,
+                                                            stationId
+                                                        );
+                                                        
+                                                        if (awardResult.success) {
+                                                            flexDollarsAwarded = {
+                                                                amount: rewardAmount,
+                                                                reason: `Station below 25% capacity (${Math.round((occupiedDocks / totalCapacity) * 100)}% occupied)`,
+                                                                newBalance: awardResult.newBalance
+                                                            };
+                                                            console.log(` Flex dollars awarded: $${rewardAmount.toFixed(2)} to user ${userId}`);
+                                                        }
+                                                    } catch (error) {
+                                                        console.error(`Error awarding flex dollars: ${error.message}`);
+                                                        // Don't fail the return due to flex dollars error
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
                                     if (bmsManager && bmsManager.stations && bmsManager.bikes) {
                                         const station = bmsManager.stations.get(stationId);
                                         const bikeMem = bmsManager.bikes.get(bikeId);
@@ -2870,95 +3668,167 @@ async function returnBikeToConfig(userId, bikeId, stationId) {
                                         }
                                     }
 
-                                    // Get bike type for billing calculation
+                                    // Get bike type AND user tier for billing & discount calculation
                                     db.get(
                                         'SELECT type FROM r_bms_bikes WHERE id = ?',
                                         [bikeId],
-                                        (bikeErr, bike) => {
+                                        (bikeErr, bikeData) => {
                                             if (bikeErr) {
-                                                console.error('Error getting bike type:', bikeErr);
+                                                console.error('Error getting bike data:', bikeErr);
                                                 // Continue without billing info
                                             }
 
-                                            const endTime = new Date().toISOString();
-                                            let billingInfo = null;
-                                            
-                                            // Calculate billing if we have bike type
-                                            if (bike && bike.type) {
-                                                billingInfo = calculateRentalCost(rental.start_time, endTime, bike.type);
-                                            }
-
-                                            // End the rental with billing information
-                                            // Ensure rentals table has end_station_id column (SQLite: safe to attempt add)
-                                            db.run('ALTER TABLE rentals ADD COLUMN end_station_id TEXT', [], (alterErr) => {
-                                                // ignore alterErr (column may already exist)
-
-                                                // End the rental with billing information and record end station
-                                                const updateQuery = billingInfo ?
-                                                    'UPDATE rentals SET status = ?, end_time = ?, total_cost = ?, end_station_id = ? WHERE id = ?' :
-                                                    'UPDATE rentals SET status = ?, end_time = ?, end_station_id = ? WHERE id = ?';
-
-                                                const updateParams = billingInfo ?
-                                                    ['completed', endTime, billingInfo.totalCost, stationId, rental.id] :
-                                                    ['completed', endTime, stationId, rental.id];
-
-                                                db.run(updateQuery, updateParams, function(rentalErr) {
-                                                    if (rentalErr) {
-                                                        console.error('Error ending rental:', rentalErr);
-                                                        // Rollback bike status
-                                                        db.run('UPDATE r_bms_bikes SET status = ?, station_id = ? WHERE id = ?', 
-                                                               ['on_trip', null, bikeId]);
-                                                        return resolve({
-                                                            success: false,
-                                                            message: 'Failed to end rental'
-                                                        });
-                                                    }
-
-                                                    const duration = Date.now() - new Date(rental.start_time).getTime();
-                                                    console.log(`SUCCESS: Bike ${bikeId} returned to station ${stationId} by user ${userId}`);
+                                            // Now get user tier for discount
+                                            db.get(
+                                                'SELECT loyalty_tier FROM users WHERE id = ?',
+                                                [userId],
+                                                (tierErr, tierData) => {
+                                                    const endTime = new Date().toISOString();
+                                                    let billingInfo = null;
+                                                    let finalCost = 0;
                                                     
-                                                    // Log rental completion activity
-                                                    const durationMinutes = Math.ceil(duration / (1000 * 60));
-                                                    const durationHours = Math.floor(durationMinutes / 60);
-                                                    const durationMins = durationMinutes % 60;
-                                                    const durationText = durationHours > 0 ? `${durationHours}h ${durationMins}m` : `${durationMins}m`;
-                                                    
-                                                    logUserActivity(userId, 'rental_completed', bikeId, stationId, {
-                                                        bike_type: bike.type === 'electric' ? '⚡ E-Bike' : '🚴 Standard',
-                                                        bike_type_raw: bike.type, // Add raw type for frontend logic
-                                                        return_station_id: stationId,
-                                                        pickup_station_id: rental.station_id,
-                                                        duration: durationText,
-                                                        duration_minutes: durationMinutes, // Add duration in minutes
-                                                        cost: billingInfo ? billingInfo.totalCost : 0
-                                                    });
-                                                    
-                                                    const response = {
-                                                        success: true,
-                                                        message: `Bike ${bikeId} successfully returned to station ${stationId}`,
-                                                        return: {
-                                                            bikeId,
-                                                            stationId,
-                                                            userId,
-                                                            endTime,
-                                                            duration
+                                                    // Calculate billing if we have bike type
+                                                    if (bikeData && bikeData.type) {
+                                                        billingInfo = calculateRentalCost(rental.start_time, endTime, bikeData.type);
+                                                        finalCost = billingInfo.totalCost;
+                                                        
+                                                        // Apply loyalty tier discount
+                                                        if (loyaltyService && tierData) {
+                                                            try {
+                                                                const userLoyaltyTier = tierData.loyalty_tier || 'entry';
+                                                                const tierBenefits = loyaltyService.getTierBenefits(userLoyaltyTier);
+                                                                const discountPercentage = tierBenefits.discountPercentage;
+                                                                if (discountPercentage > 0) {
+                                                                    const discountAmount = Number((finalCost * (discountPercentage / 100)).toFixed(2));
+                                                                    finalCost = Number((finalCost - discountAmount).toFixed(2));
+                                                                    console.log(`Discount applied: ${userLoyaltyTier} tier - ${discountPercentage}% off. Original: $${billingInfo.totalCost}, Final: $${finalCost}`);
+                                                                }
+                                                            } catch (error) {
+                                                                console.error('Error applying discount:', error);
+                                                            }
                                                         }
-                                                    };
-
-                                                    // Add billing info to response if available
-                                                    if (billingInfo) {
-                                                        response.billing = {
-                                                            totalCost: billingInfo.totalCost,
-                                                            durationMinutes: billingInfo.durationMinutes,
-                                                            ratePerMinute: billingInfo.ratePerMinute,
-                                                            bikeType: bike.type
-                                                        };
-                                                        response.message += ` - Total charge: $${billingInfo.totalCost.toFixed(2)} for ${billingInfo.durationMinutes} minutes`;
                                                     }
 
-                                                    resolve(response);
-                                                });
-                                            });
+                                                    // End the rental with billing information
+                                                    // Ensure rentals table has end_station_id column (SQLite: safe to attempt add)
+                                                    db.run('ALTER TABLE rentals ADD COLUMN end_station_id TEXT', [], (alterErr) => {
+                                                        // ignore alterErr (column may already exist)
+
+                                                        // End the rental with billing information and record end station
+                                                        const updateQuery = billingInfo ?
+                                                            'UPDATE rentals SET status = ?, end_time = ?, total_cost = ?, end_station_id = ? WHERE id = ?' :
+                                                            'UPDATE rentals SET status = ?, end_time = ?, end_station_id = ? WHERE id = ?';
+
+                                                        const updateParams = billingInfo ?
+                                                            ['completed', endTime, finalCost, stationId, rental.id] :
+                                                            ['completed', endTime, stationId, rental.id];
+
+                                                        db.run(updateQuery, updateParams, function(rentalErr) {
+                                                            if (rentalErr) {
+                                                                console.error('Error ending rental:', rentalErr);
+                                                                // Rollback bike status
+                                                                db.run('UPDATE r_bms_bikes SET status = ?, station_id = ? WHERE id = ?', 
+                                                                       ['on_trip', null, bikeId]);
+                                                                return resolve({
+                                                                    success: false,
+                                                                    message: 'Failed to end rental'
+                                                                });
+                                                            }
+
+                                                            const duration = Date.now() - new Date(rental.start_time).getTime();
+                                                            console.log(`SUCCESS: Bike ${bikeId} returned to station ${stationId} by user ${userId}`);
+                                                            
+                                                            // Log rental completion activity
+                                                            const durationMinutes = Math.ceil(duration / (1000 * 60));
+                                                            const durationHours = Math.floor(durationMinutes / 60);
+                                                            const durationMins = durationMinutes % 60;
+                                                            const durationText = durationHours > 0 ? `${durationHours}h ${durationMins}m` : `${durationMins}m`;
+                                                            
+                                                            logUserActivity(userId, 'rental_completed', bikeId, stationId, {
+                                                                bike_type: bikeData?.type === 'electric' ? '⚡ E-Bike' : '🚴 Standard',
+                                                                bike_type_raw: bikeData?.type, // Add raw type for frontend logic
+                                                                return_station_id: stationId,
+                                                                pickup_station_id: rental.station_id,
+                                                                duration: durationText,
+                                                                duration_minutes: durationMinutes, // Add duration in minutes
+                                                                cost: billingInfo ? billingInfo.totalCost : 0
+                                                            });
+                                                            
+                                                            const response = {
+                                                                success: true,
+                                                                message: `Bike ${bikeId} successfully returned to station ${stationId}`,
+                                                                return: {
+                                                                    bikeId,
+                                                                    stationId,
+                                                                    userId,
+                                                                    endTime,
+                                                                    duration
+                                                                }
+                                                            };
+
+                                                            // Add billing info to response if available
+                                                            if (billingInfo) {
+                                                                response.billing = {
+                                                                    totalCost: finalCost,
+                                                                    originalCost: billingInfo.totalCost,
+                                                                    durationMinutes: billingInfo.durationMinutes,
+                                                                    ratePerMinute: billingInfo.ratePerMinute,
+                                                                    bikeType: bikeData?.type
+                                                                };
+                                                                response.message += ` - Total charge: $${finalCost.toFixed(2)} for ${billingInfo.durationMinutes} minutes`;
+                                                            }
+                                                            // Add flex dollars info if awarded
+                                                            if (flexDollarsAwarded) {
+                                                                response.flexDollars = flexDollarsAwarded;
+                                                                response.message += ` - Earned $${flexDollarsAwarded.amount.toFixed(2)} flex dollars for supporting our network!`;
+                                                            }
+
+                                                            // Calculate new tier after successful return
+                                                            if (loyaltyService) {
+                                                                try {
+                                                                    // Get current tier before calculating new one
+                                                                    db.get('SELECT loyalty_tier FROM users WHERE id = ?', [userId], async (tierErr, tierData) => {
+                                                                        const oldTier = tierData?.loyalty_tier || 'entry';
+                                                                        
+                                                                        // Calculate new tier
+                                                                        const newTier = await loyaltyService.calculateUserTier(userId);
+                                                                        console.log(`[Return/Tier] User ${userId}: Old tier: ${oldTier}, New tier: ${newTier}`);
+                                                                        
+                                                                        // If tier changed, update and include notification
+                                                                        if (oldTier !== newTier) {
+                                                                            console.log(`[Return/Tier] Tier changed - updating from ${oldTier} to ${newTier}`);
+                                                                            await loyaltyService.updateUserTier(userId, newTier);
+                                                                            
+                                                                            const isPromotion = (oldTier === 'entry' || 
+                                                                                (oldTier === 'bronze' && (newTier === 'silver' || newTier === 'gold')) ||
+                                                                                (oldTier === 'silver' && newTier === 'gold'));
+                                                                            
+                                                                            response.tierNotification = {
+                                                                                type: isPromotion ? 'promotion' : 'demotion',
+                                                                                oldTier,
+                                                                                newTier,
+                                                                                message: isPromotion 
+                                                                                    ? `Great job! You've been promoted to ${newTier.charAt(0).toUpperCase() + newTier.slice(1)} tier!`
+                                                                                    : `Your tier has changed to ${newTier.charAt(0).toUpperCase() + newTier.slice(1)}`
+                                                                            };
+                                                                            console.log(`[Return/Tier] Created notification:`, response.tierNotification);
+                                                                        } else {
+                                                                            console.log(`[Return/Tier] No tier change detected`);
+                                                                        }
+                                                                        
+                                                                        resolve(response);
+                                                                    });
+                                                                } catch (tierError) {
+                                                                    console.error('Error calculating loyalty tier:', tierError);
+                                                                    resolve(response); // Still return success even if tier calc fails
+                                                                }
+                                                            } else {
+                                                                resolve(response);
+                                                            }
+                                                        });
+                                                    });
+                                                }
+                                            );
                                         }
                                     );
                                 }
@@ -3058,6 +3928,61 @@ process.on('SIGINT', async () => {
     process.exit(0);
 });
 
+// ===== FLEX DOLLARS ENDPOINTS (DM-03, DM-04) =====
+
+// Get flex dollars balance for a rider (riders only)
+app.get('/api/flex-dollars/balance', authenticateUser, requireRider, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const balance = await flexDollarsService.getBalance(userId);
+        
+        res.json({
+            success: true,
+            message: 'Flex dollars balance retrieved',
+            balance: balance.balance,
+            formattedBalance: `$${balance.balance.toFixed(2)}`,
+            userId: userId
+        });
+    } catch (error) {
+        console.error('Error retrieving flex dollars balance:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error retrieving flex dollars balance',
+            error: error.message
+        });
+    }
+});
+
+// Get flex dollars transaction history (riders only)
+app.get('/api/flex-dollars/history', authenticateUser, requireRider, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const limit = req.query.limit ? parseInt(req.query.limit) : 50;
+        const offset = req.query.offset ? parseInt(req.query.offset) : 0;
+        
+        const history = await flexDollarsService.getTransactionHistory(userId, limit, offset);
+        
+        res.json({
+            success: true,
+            message: 'Flex dollars transaction history retrieved',
+            userId: userId,
+            transactions: history.transactions,
+            totalCount: history.totalCount,
+            pagination: {
+                limit: history.limit,
+                offset: history.offset
+            }
+        });
+    } catch (error) {
+        console.error('Error retrieving flex dollars history:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error retrieving transaction history',
+            error: error.message
+        });
+    }
+});
+
 // Notifications: Get empty/full docking station notifications for user profile
 app.get('/api/notifications/stations', (req, res) => {
     try {
@@ -3108,6 +4033,85 @@ app.get('/api/notifications/stations', (req, res) => {
 // Start server
 async function startServer() {
     await initializeApp();
+
+    // ============ FORUM ROUTES ============
+    
+    // Get all forum posts (public)
+    app.get('/api/forum/posts', (req, res) => {
+        const query = `
+            SELECT fp.id, fp.content, fp.created_at, u.username
+            FROM forum_posts fp
+            JOIN users u ON fp.user_id = u.id
+            ORDER BY fp.created_at DESC
+        `;
+        
+        db.all(query, [], (err, rows) => {
+            if (err) {
+                console.error('Error fetching forum posts:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error fetching forum posts',
+                    error: err.message
+                });
+            }
+            
+            res.json({
+                success: true,
+                posts: rows || []
+            });
+        });
+    });
+    
+    // Create a new forum post (riders only)
+    app.post('/api/forum/posts', authenticateUser, requireRider, (req, res) => {
+        const { content } = req.body;
+        const userId = req.user.id;
+        
+        console.log(`Forum post request from user: ${userId} (${req.user.username})`);
+        
+        // Validate content
+        if (!content || content.trim().length === 0) {
+            console.warn(`Empty post content from user ${userId}`);
+            return res.status(400).json({
+                success: false,
+                message: 'Post content cannot be empty'
+            });
+        }
+        
+        if (content.length > 5000) {
+            console.warn(`Post too long from user ${userId}: ${content.length} characters`);
+            return res.status(400).json({
+                success: false,
+                message: 'Post content cannot exceed 5000 characters'
+            });
+        }
+        
+        const query = `
+            INSERT INTO forum_posts (user_id, content, created_at, updated_at)
+            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        `;
+        
+        db.run(query, [userId, content], function(err) {
+            if (err) {
+                console.error('Error creating forum post:', err);
+                return res.status(500).json({
+                    success: false,
+                    message: 'Error creating forum post',
+                    error: err.message
+                });
+            }
+            
+            console.log(`Forum post created successfully - Post ID: ${this.lastID}, User: ${userId}`);
+            res.status(201).json({
+                success: true,
+                message: 'Forum post created successfully',
+                postId: this.lastID
+            });
+        });
+    });
+    
+    // ============ END FORUM ROUTES ============
+    
     app.listen(PORT, () => {
         console.log(`🚀 Server running on http://localhost:${PORT}`);
         console.log(`📱 Frontend should be running on http://localhost:3000`);

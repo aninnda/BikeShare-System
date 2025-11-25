@@ -7,27 +7,43 @@
  * - Enforcing R-BMS-02: Prevent undocking from empty stations and docking to full stations
  * - Bike reservation and rental operations
  * - System-wide state management
+ * - Flex Dollars rewards for returning bikes to understocked stations
  */
 
 const Bike = require('./Bike');
 const Station = require('./Station');
-const { BMS_STATES, BMS_OPERATIONS, STATION_CONFIG } = require('../../config/constants');
+const { BMS_STATES, BMS_OPERATIONS, STATION_CONFIG, FLEX_DOLLARS_CONFIG } = require('../../config/constants');
 
 class BMSManager {
-    constructor() {
+    constructor(flexDollarsService = null) {
         this.stations = new Map(); // stationId -> Station object
         this.bikes = new Map(); // bikeId -> Bike object
         this.activeRentals = new Map(); // userId -> rental info
+        this.flexDollarsService = flexDollarsService; // Optional service for flex dollars
         this.systemStats = {
             totalOperations: 0,
             successfulDocks: 0,
             failedDocks: 0,
             successfulUndocks: 0,
             failedUndocks: 0,
-            blockedOperations: 0
+            blockedOperations: 0,
+            flexDollarsAwarded: 0
         };
         
         console.log('BMS Manager initialized with sanity checking enabled');
+        if (flexDollarsService) {
+            console.log('Flex Dollars Service enabled - riders will receive rewards for returning bikes to understocked stations');
+        }
+
+    }
+
+    /**
+     * Set the FlexDollarsService for awarding flex dollars
+     * Called during server initialization
+     */
+    setFlexDollarsService(flexDollarsService) {
+        this.flexDollarsService = flexDollarsService;
+        console.log('Flex Dollars Service has been set on BMSManager');
     }
 
     /**
@@ -221,8 +237,9 @@ class BMSManager {
     /**
      * R-BMS-02: Return a bike (dock to station)
      * Prevents docking to full stations
+     * DM-03: Award flex dollars if station is below 25% occupancy
      */
-    returnBike(userId, bikeId, stationId) {
+    async returnBike(userId, bikeId, stationId) {
         this.systemStats.totalOperations++;
 
         // Validation: Check if user has active rental
@@ -264,6 +281,41 @@ class BMSManager {
             rental.returnStationId = stationId;
             rental.status = 'completed';
             this.activeRentals.delete(userId);
+
+            // Business Rule: DM-03, DM-04 - Award flex dollars for returning to understocked stations
+            // Check if station is below minimum occupancy (25%) after the return
+            if (this.flexDollarsService && dockResult.stationInfo) {
+                const stationInfo = dockResult.stationInfo;
+                const occupiedDocks = stationInfo.numberOfBikesDocked;
+                const totalCapacity = stationInfo.capacity;
+                
+                // Check if station is now below 25% capacity
+                if (this.flexDollarsService.isBelowMinimumOccupancy(occupiedDocks, totalCapacity)) {
+                    try {
+                        const rewardAmount = this.flexDollarsService.getRewardAmount();
+                        const awardResult = await this.flexDollarsService.awardFlexDollars(
+                            userId,
+                            rewardAmount,
+                            `Bike returned to ${station.name} (${occupiedDocks}/${totalCapacity} capacity)`,
+                            null, // relatedRentalId can be added if needed
+                            stationId
+                        );
+                        
+                        if (awardResult.success) {
+                            this.systemStats.flexDollarsAwarded++;
+                            dockResult.flexDollarsAwarded = {
+                                amount: rewardAmount,
+                                reason: `Station below 25% capacity (${Math.round((occupiedDocks / totalCapacity) * 100)}% occupied)`,
+                                newBalance: awardResult.newBalance
+                            };
+                            console.log(`✅ Flex dollars awarded: $${rewardAmount.toFixed(2)} to user ${userId} for understocked station return`);
+                        }
+                    } catch (error) {
+                        console.error(`Error awarding flex dollars: ${error.message}`);
+                        // Don't fail the return due to flex dollars error, just log it
+                    }
+                }
+            }
         } else {
             this.systemStats.failedDocks++;
             if (dockResult.operation === BMS_OPERATIONS.RETURN_FAILED_STATION_FULL) {

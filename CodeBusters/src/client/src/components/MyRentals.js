@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import TierNotification from './TierNotification';
 import './style/MyRentals.css';
 
 const MyRentals = () => {
@@ -62,6 +64,8 @@ const MyRentals = () => {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [showReturnStations, setShowReturnStations] = useState(false);
     const [returnStations, setReturnStations] = useState([]);
+    const [tierNotification, setTierNotification] = useState(null);
+    const { updateUserLoyaltyTier } = useAuth();
 
     // Timer for countdown updates
     useEffect(() => {
@@ -377,6 +381,9 @@ const MyRentals = () => {
 
             const data = await response.json();
             
+            console.log('[Return Bike] Response data:', data);
+            console.log('[Return Bike] Tier notification:', data.tierNotification);
+            
             if (data.success) {
                 // Calculate rental duration for summary
                 const startTime = new Date(activeRental.startTime);
@@ -385,13 +392,30 @@ const MyRentals = () => {
                 const hours = Math.floor(durationMs / (1000 * 60 * 60));
                 const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
 
-                alert(
-                    `Bike ${activeRental.bikeId} successfully returned to ${stationName}!\n\n` +
-                    `Rental Summary:\n` +
-                    `Duration: ${hours}h ${minutes}m\n` +
-                    `Returned to: ${stationName} (Dock ${dockId})\n` +
-                    `Final cost will be calculated based on your rental duration.`
-                );
+                // Check if tier changed and show notification
+                if (data.tierNotification) {
+                    console.log('[Return Bike] Setting tier notification:', data.tierNotification);
+                    setTierNotification(data.tierNotification);
+                    updateUserLoyaltyTier(data.tierNotification.newTier);
+                    // Notify Profile component of tier update
+                    window.dispatchEvent(new CustomEvent('tierUpdated', {
+                        detail: { 
+                            oldTier: data.tierNotification.oldTier,
+                            newTier: data.tierNotification.newTier
+                        }
+                    }));
+                }
+
+                // Delay alert slightly to allow notification to render first
+                setTimeout(() => {
+                    alert(
+                        `Bike ${activeRental.bikeId} successfully returned to ${stationName}!\n\n` +
+                        `Rental Summary:\n` +
+                        `Duration: ${hours}h ${minutes}m\n` +
+                        `Returned to: ${stationName} (Dock ${dockId})\n` +
+                        `Final cost will be calculated based on your rental duration.`
+                    );
+                }, 100);
                 
                 // Clear local active rental
                 localStorage.removeItem('activeRental');
@@ -431,8 +455,102 @@ const MyRentals = () => {
         setReturnStations([]);
     };
 
+    // Report bike damage
+    const reportDamage = async () => {
+        if (!activeRental) {
+            alert('No active rental to report damage for');
+            return;
+        }
+
+        const description = prompt(
+            'Please describe the damage to the bike:\n\n' +
+            `Bike: ${activeRental.bikeId}\n` +
+            `Station: ${activeRental.stationName || activeRental.stationId}\n\n` +
+            'Note: Your rental will be ended immediately upon reporting damage.\n' +
+            'Your report will be sent to operators immediately.'
+        );
+
+        if (!description || description.trim() === '') {
+            return; // User cancelled or entered nothing
+        }
+
+        try {
+            const user = JSON.parse(localStorage.getItem('user'));
+            if (!user) {
+                alert('Please log in to report damage');
+                return;
+            }
+
+            const response = await fetch(`http://localhost:5001/api/bikes/${activeRental.bikeId}/report-damage`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`,
+                    'x-user-id': String(user.id),
+                    'x-username': user.username,
+                    'x-user-role': user.role || 'rider'
+                },
+                body: JSON.stringify({
+                    description: description.trim()
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Clear active rental from localStorage
+                localStorage.removeItem('activeRental');
+                
+                // Notify other components
+                window.dispatchEvent(new Event('activeRentalChanged'));
+                window.dispatchEvent(new StorageEvent('storage', { key: 'activeRental', newValue: null }));
+                
+                // Clear local state
+                setActiveRental(null);
+                
+                // Show success message with rental details
+                const hours = Math.floor(data.duration / 60);
+                const minutes = data.duration % 60;
+                
+                alert(
+                    `✓ Damage Report Submitted Successfully\n\n` +
+                    `Report ID: #${data.reportId}\n` +
+                    `Bike: ${data.bikeId}\n` +
+                    `Location: ${data.stationName}\n` +
+                    `Status: NOT AVAILABLE (Maintenance Required)\n\n` +
+                    `RENTAL ENDED\n` +
+                    `Duration: ${hours}h ${minutes}m\n` +
+                    `Cost: $${data.totalCost.toFixed(2)}\n\n` +
+                    `The bike will remain at ${data.stationName} for inspection.\n` +
+                    `All operators have been notified.\n\n` +
+                    `Thank you for helping keep our fleet safe!`
+                );
+                
+                // Dispatch event to notify ride history to refresh
+                window.dispatchEvent(new CustomEvent('rentalEnded', {
+                    detail: { 
+                        bikeId: data.bikeId,
+                        stationId: data.stationId,
+                        stationName: data.stationName,
+                        duration: { hours, minutes }
+                    }
+                }));
+            } else {
+                alert(`Failed to submit damage report:\n\n${data.message}`);
+            }
+        } catch (err) {
+            console.error('Error reporting damage:', err);
+            alert('Network error while submitting damage report.\nPlease try again or contact support.');
+        }
+    };
+
     return (
         <div className="my-rentals-container">
+            <TierNotification 
+                notification={tierNotification}
+                onClose={() => setTierNotification(null)}
+            />
+            
             <div className="header">
                 <h1>My Rentals & Reservations</h1>
                 <p>Manage your active bike reservations and rentals</p>
@@ -470,6 +588,12 @@ const MyRentals = () => {
                                             onClick={showReturnOptions}
                                         >
                                             Return Bike
+                                        </button>
+                                        <button 
+                                            className="report-damage-button" 
+                                            onClick={reportDamage}
+                                        >
+                                             Report Damage
                                         </button>
                                     </div>
                                 </div>

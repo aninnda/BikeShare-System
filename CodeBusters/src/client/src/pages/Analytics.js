@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import DamageReportNotifications from '../components/DamageReportNotifications';
 import './style/Analytics.css';
 
 const Analytics = () => {
@@ -10,15 +11,16 @@ const Analytics = () => {
     // State management
     const [rides, setRides] = useState([]);
     const [filteredRides, setFilteredRides] = useState([]);
+    const [showOwn, setShowOwn] = useState(false); // show only current user's rides (for dual)
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all'); // 'all', 'active', 'completed'
     const [sortBy, setSortBy] = useState('newest'); // 'newest', 'oldest', 'duration', 'cost'
 
-    // Check if user is operator
+    // Check if user is operator (allow 'dual' as operator-equivalent)
     useEffect(() => {
-        if (!user || user.role !== 'operator') {
+        if (!user || (user.role !== 'operator' && user.role !== 'dual')) {
             navigate('/');
         }
     }, [user, navigate]);
@@ -40,7 +42,10 @@ const Analytics = () => {
             const data = await response.json();
 
             if (data.success || data.rentals) {
-                const ridesData = data.rentals || data.data || [];
+                let ridesData = data.rentals || data.data || [];
+                if (showOwn && user && user.id) {
+                    ridesData = ridesData.filter(r => String(r.user_id) === String(user.id) || String(r.username) === String(user.username));
+                }
                 setRides(ridesData);
                 setFilteredRides(ridesData);
             } else {
@@ -52,11 +57,11 @@ const Analytics = () => {
         } finally {
             setLoading(false);
         }
-    }, [user]);
+    }, [user, showOwn]);
 
-    // Load rides on mount
+    // Load rides on mount (allow 'dual' to fetch operator rides too)
     useEffect(() => {
-        if (user && user.role === 'operator') {
+        if (user && (user.role === 'operator' || user.role === 'dual')) {
             fetchRides();
         }
     }, [user, fetchRides]);
@@ -154,6 +159,9 @@ const Analytics = () => {
                 <p className="manage-rides-subtitle">View and monitor all bike rentals</p>
             </div>
 
+            {/* Damage Report Notifications */}
+            <DamageReportNotifications user={user} />
+
             {/* Statistics Cards */}
             <div className="stats-grid">
                 <div className="stat-card">
@@ -195,6 +203,12 @@ const Analytics = () => {
                 </div>
                 
                 <div className="filters">
+                    {user && user.role === 'dual' && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#333', marginRight: '12px' }}>
+                            <input type="checkbox" checked={showOwn} onChange={(e) => setShowOwn(e.target.checked)} />
+                            <span style={{ fontSize: '0.95rem' }}>My Rides Only</span>
+                        </label>
+                    )}
                     <select
                         value={filterStatus}
                         onChange={(e) => setFilterStatus(e.target.value)}

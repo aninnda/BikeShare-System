@@ -180,3 +180,72 @@
     font-size: 0.9rem;
     color: #0c5460;
 }
+
+/* Saved Card Section */
+.saved-card-section {
+    margin-top: 20px;
+}
+
+.payment-method-title {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 15px;
+}
+
+.saved-card-display {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 25px;
+    border-radius: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+    color: white;
+}
+
+.card-icon {
+    font-size: 3rem;
+}
+
+.card-details {
+    flex: 1;
+}
+
+.card-number {
+    font-size: 1.2rem;
+    font-weight: 600;
+    letter-spacing: 2px;
+    margin-bottom: 8px;
+}
+
+.card-holder {
+    font-size: 0.95rem;
+    opacity: 0.9;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+}
+
+.card-expiry {
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+/* Link Button */
+.payment-button-link {
+    background: none;
+    border: none;
+    color: #667eea;
+    text-decoration: underline;
+    cursor: pointer;
+    font-size: 0.95rem;
+    padding: 5px 0;
+    margin-bottom: 15px;
+    display: block;
+    font-weight: 500;
+}
+
+.payment-button-link:hover {
+    color: #764ba2;
+}
