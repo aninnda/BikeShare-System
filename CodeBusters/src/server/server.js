@@ -1711,8 +1711,8 @@ function setupRoutes() {
 
                 // Insert demo user
                 db.run(
-                    'INSERT INTO users (username, password, first_name, last_name, email, address, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                    [demoUser.username, demoUser.password, demoUser.firstName, demoUser.lastName, demoUser.email, demoUser.address, demoUser.role],
+                    'INSERT INTO users (username, password, first_name, last_name, email, address, role, loyalty_tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    [demoUser.username, demoUser.password, demoUser.firstName, demoUser.lastName, demoUser.email, demoUser.address, demoUser.role, 'entry'],
                     function(insertErr) {
                         if (insertErr) {
                             console.error('Error creating demo user:', insertErr.message);
@@ -1797,8 +1797,8 @@ function setupRoutes() {
         }
         
         db.run(
-            'INSERT INTO users (username, password, first_name, last_name, email, address, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [username, password, firstName, lastName, email, address, role],
+            'INSERT INTO users (username, password, first_name, last_name, email, address, role, loyalty_tier) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            [username, password, firstName, lastName, email, address, role, 'entry'],
             function(err) {
                 if (err) {
                     if (err.message.includes('UNIQUE constraint failed')) {
