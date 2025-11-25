@@ -1738,7 +1738,7 @@ function setupRoutes() {
                                                 updateStationStatus(rentalStationId);
                                                 
                                                 // Create notification for operators
-                                                const notificationMessage = `⚠️ DAMAGE REPORT: Bike ${bikeId} at ${stationName}. Rental ended automatically. Reported by ${username}. Description: ${description || 'No details provided'}. Cost: $${totalCost.toFixed(2)}`;
+                                                const notificationMessage = ` DAMAGE REPORT: Bike ${bikeId} at ${stationName}. Rental ended automatically. Reported by ${username}. Description: ${description || 'No details provided'}. Cost: $${totalCost.toFixed(2)}`;
                                                 
                                                 db.run(
                                                     'INSERT INTO operator_notifications (type, bike_id, station_id, user_id, username, message) VALUES (?, ?, ?, ?, ?, ?)',
@@ -2463,13 +2463,45 @@ function setupRoutes() {
                     maintenanceBikesCount: maintenanceBikes.length,
                     onTripBikesCount: 0, // on_trip bikes don't have station_id, so 0 here
                     
+                    // Grouped bikes for easier client consumption
+                    availableBikes: {
+                        count: availableBikes.length,
+                        bikes: availableBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status,
+                            reservationExpiry: bike.reservation_expiry || null
+                        }))
+                    },
+                    reservedBikes: {
+                        count: reservedBikes.length,
+                        bikes: reservedBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status,
+                            reservationExpiry: bike.reservation_expiry || null
+                        }))
+                    },
+                    maintenanceBikes: {
+                        count: maintenanceBikes.length,
+                        bikes: maintenanceBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status
+                        }))
+                    },
+                    
                     // Bike type breakdowns (for ALL bikes at station)
                     totalStandardBikes: bikesList.filter(bike => bike.type === 'standard').length,
                     totalEBikes: bikesList.filter(bike => bike.type === 'e-bike').length,
+                    totalBikes: bikesList.length,
                     
                     // Docked bike type breakdowns (excludes maintenance)
                     dockedStandardBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'standard').length,
-                    dockedEBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'e-bike').length
+                    dockedEBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'e-bike').length,
+                    
+                    // Summary text
+                    summary: `${availableBikes.length} available • ${reservedBikes.length} reserved • ${maintenanceBikes.length} in maintenance`
                 };
             }));
             

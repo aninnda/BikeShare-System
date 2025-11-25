@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import DamageReportNotifications from '../components/DamageReportNotifications';
 import './style/ManageBikes.css';
 
 const ManageBikes = () => {
@@ -258,6 +259,9 @@ const ManageBikes = () => {
                 <h1 className="manage-title">Operator Management</h1>
                 <p className="manage-subtitle">Manage bikes and stations</p>
             </div>
+
+            {/* Damage Report Notifications */}
+            <DamageReportNotifications user={user} />
 
             {message && (
                 <div className={`manage-message ${messageType}`}>

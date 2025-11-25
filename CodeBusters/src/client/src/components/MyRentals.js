@@ -593,7 +593,7 @@ const MyRentals = () => {
                                             className="report-damage-button" 
                                             onClick={reportDamage}
                                         >
-                                            ⚠️ Report Damage
+                                             Report Damage
                                         </button>
                                     </div>
                                 </div>

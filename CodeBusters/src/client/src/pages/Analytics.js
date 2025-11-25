@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import DamageReportNotifications from '../components/DamageReportNotifications';
 import './style/Analytics.css';
 
 const Analytics = () => {
@@ -157,6 +158,9 @@ const Analytics = () => {
                 <h1 className="manage-rides-title">Ride Management</h1>
                 <p className="manage-rides-subtitle">View and monitor all bike rentals</p>
             </div>
+
+            {/* Damage Report Notifications */}
+            <DamageReportNotifications user={user} />
 
             {/* Statistics Cards */}
             <div className="stats-grid">
