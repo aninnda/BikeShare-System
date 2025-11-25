@@ -1589,6 +1589,193 @@ function setupRoutes() {
         );
     });
 
+    // Report bike damage (riders can report, sets status to maintenance)
+    app.post('/api/bikes/:id/report-damage', authenticateUser, (req, res) => {
+        const bikeId = req.params.id;
+        const { description } = req.body;
+        const userId = req.headers['x-user-id'];
+        const username = req.headers['x-username'];
+        
+        // First, check if user has an active rental with this bike
+        db.get('SELECT * FROM rentals WHERE bike_id = ? AND user_id = ? AND status = ?', 
+            [bikeId, userId, 'active'], 
+            (rentalErr, rental) => {
+                if (rentalErr) {
+                    console.error('Error checking rental:', rentalErr.message);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Database error' 
+                    });
+                }
+
+                if (!rental) {
+                    return res.status(400).json({ 
+                        success: false, 
+                        message: 'You can only report damage for bikes you are currently renting' 
+                    });
+                }
+
+                const rentalStationId = rental.station_id; // Station where bike was originally rented
+
+                // Create notifications table if it doesn't exist
+                db.run(`CREATE TABLE IF NOT EXISTS operator_notifications (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    type TEXT NOT NULL,
+                    bike_id TEXT,
+                    station_id TEXT,
+                    user_id INTEGER,
+                    username TEXT,
+                    message TEXT NOT NULL,
+                    read INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )`, (notifTableErr) => {
+                    if (notifTableErr) {
+                        console.error('Error creating notifications table:', notifTableErr.message);
+                    }
+                });
+
+                // Create damage_reports table if it doesn't exist
+                db.run(`CREATE TABLE IF NOT EXISTS damage_reports (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    bike_id TEXT NOT NULL,
+                    station_id TEXT NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    username TEXT,
+                    description TEXT,
+                    status TEXT DEFAULT 'pending',
+                    reported_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    resolved_at DATETIME
+                )`, (createErr) => {
+                    if (createErr) {
+                        console.error('Error creating damage_reports table:', createErr.message);
+                        return res.status(500).json({ 
+                            success: false, 
+                            message: 'Database error' 
+                        });
+                    }
+
+                    // Get station name for better reporting
+                    db.get('SELECT name FROM stations WHERE id = ?', [rentalStationId], (stationErr, station) => {
+                        const stationName = station ? station.name : rentalStationId;
+
+                        // Insert damage report
+                        db.run(
+                            'INSERT INTO damage_reports (bike_id, station_id, user_id, username, description) VALUES (?, ?, ?, ?, ?)',
+                            [bikeId, rentalStationId, userId, username, description || 'Bike damage reported'],
+                            function(insertErr) {
+                                if (insertErr) {
+                                    console.error('Error inserting damage report:', insertErr.message);
+                                    return res.status(500).json({ 
+                                        success: false, 
+                                        message: 'Failed to submit damage report' 
+                                    });
+                                }
+
+                                const reportId = this.lastID;
+
+                                // End the active rental immediately due to damage report
+                                const endTime = new Date().toISOString();
+                                const startTime = new Date(rental.start_time);
+                                const duration = Math.ceil((new Date(endTime) - startTime) / (1000 * 60)); // in minutes
+                                
+                                // Calculate cost
+                                const bikeIdNum = parseInt(bikeId.replace('BIKE', ''));
+                                const eBikeIds = [2, 5, 7, 10, 12, 14, 17, 19, 21, 23, 24, 27, 29, 32, 34, 36, 37, 39, 42, 43, 45, 47, 49, 51, 53, 55, 57, 59, 61, 64, 66, 68, 70, 72, 74, 76];
+                                const bikeType = eBikeIds.includes(bikeIdNum) ? 'e-bike' : 'standard';
+                                const ratePerMinute = bikeType === 'e-bike' ? 0.25 : 0.10;
+                                const totalCost = Math.round(duration * ratePerMinute * 100) / 100;
+
+                                // Update rental to completed
+                                db.run(
+                                    'UPDATE rentals SET status = ?, end_time = ?, total_cost = ? WHERE id = ?',
+                                    ['completed', endTime, totalCost, rental.id],
+                                    function(rentalUpdateErr) {
+                                        if (rentalUpdateErr) {
+                                            console.error('Error ending rental:', rentalUpdateErr.message);
+                                            // Continue anyway - damage report is more important
+                                        } else {
+                                            console.log(`✓ Rental #${rental.id} ended due to damage report. Duration: ${duration} min, Cost: $${totalCost.toFixed(2)}`);
+                                        }
+
+                                        // Update bike status to maintenance
+                                        db.run(
+                                            'UPDATE r_bms_bikes SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+                                            ['maintenance', bikeId],
+                                            function(updateErr) {
+                                                if (updateErr) {
+                                                    console.error('Error updating bike status:', updateErr.message);
+                                                    return res.status(500).json({ 
+                                                        success: false, 
+                                                        message: 'Damage report saved but failed to update bike status' 
+                                                    });
+                                                }
+                                                
+                                                // If bike wasn't in database (shouldn't happen but just in case), insert it
+                                                if (this.changes === 0) {
+                                                    db.run(
+                                                        'INSERT INTO r_bms_bikes (id, type, station_id, status, created_at, updated_at) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)',
+                                                        [bikeId, bikeType, rentalStationId, 'maintenance'],
+                                                        function(insertBikeErr) {
+                                                            if (insertBikeErr) {
+                                                                console.error('Error inserting bike:', insertBikeErr.message);
+                                                            }
+                                                        }
+                                                    );
+                                                }
+                                                
+                                                // Update BMSManager in-memory state
+                                                try {
+                                                    const bike = bmsManager.bikes.get(bikeId);
+                                                    if (bike) {
+                                                        bike.status = 'maintenance';
+                                                        console.log(`BMS updated: Bike ${bikeId} marked for maintenance due to damage report`);
+                                                    }
+                                                } catch (bmsError) {
+                                                    console.error('Error updating bike in BMS:', bmsError.message);
+                                                }
+                                                
+                                                // Update station status
+                                                updateStationStatus(rentalStationId);
+                                                
+                                                // Create notification for operators
+                                                const notificationMessage = ` DAMAGE REPORT: Bike ${bikeId} at ${stationName}. Rental ended automatically. Reported by ${username}. Description: ${description || 'No details provided'}. Cost: $${totalCost.toFixed(2)}`;
+                                                
+                                                db.run(
+                                                    'INSERT INTO operator_notifications (type, bike_id, station_id, user_id, username, message) VALUES (?, ?, ?, ?, ?, ?)',
+                                                    ['damage_report', bikeId, rentalStationId, userId, username, notificationMessage],
+                                                    function(notifErr) {
+                                                        if (notifErr) {
+                                                            console.error('Error creating operator notification:', notifErr.message);
+                                                        }
+                                                        
+                                                        console.log(`✓ Damage report #${reportId} created for bike ${bikeId} at ${rentalStationId} by user ${username}`);
+                                                        
+                                                        res.json({
+                                                            success: true,
+                                                            message: `Damage report submitted successfully. Your rental has ended automatically. Bike ${bikeId} has been marked as NOT AVAILABLE and will remain at ${stationName} for inspection. Operators have been notified.`,
+                                                            reportId: reportId,
+                                                            bikeId: bikeId,
+                                                            stationId: rentalStationId,
+                                                            stationName: stationName,
+                                                            status: 'maintenance',
+                                                            rentalEnded: true,
+                                                            duration: duration,
+                                                            totalCost: totalCost
+                                                        });
+                                                    }
+                                                );
+                                            }
+                                        );
+                                    }
+                                );
+                            }
+                        );
+                    });
+                });
+            }
+        );
+    });
+
     // Update bike status (operator only)
     app.put('/api/bikes/:id/status', authenticateUser, requireOperator, (req, res) => {
         const bikeId = req.params.id;
@@ -1652,6 +1839,123 @@ function setupRoutes() {
                     message: `Bike ${bikeId} status updated to ${status}`,
                     bikeId: bikeId,
                     status: status
+                });
+            }
+        );
+    });
+
+    // Get operator notifications (damage reports, etc.)
+    app.get('/api/operator/notifications', authenticateUser, requireOperator, (req, res) => {
+        const unreadOnly = req.query.unread === 'true';
+        
+        let query = 'SELECT * FROM operator_notifications';
+        if (unreadOnly) {
+            query += ' WHERE read = 0';
+        }
+        query += ' ORDER BY created_at DESC LIMIT 100';
+        
+        db.all(query, [], (err, notifications) => {
+            if (err) {
+                console.error('Error fetching notifications:', err.message);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Database error' 
+                });
+            }
+            
+            res.json({
+                success: true,
+                notifications: notifications || [],
+                count: notifications ? notifications.length : 0
+            });
+        });
+    });
+
+    // Mark notification as read
+    app.put('/api/operator/notifications/:id/read', authenticateUser, requireOperator, (req, res) => {
+        const notificationId = req.params.id;
+        
+        db.run(
+            'UPDATE operator_notifications SET read = 1 WHERE id = ?',
+            [notificationId],
+            function(err) {
+                if (err) {
+                    console.error('Error marking notification as read:', err.message);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Database error' 
+                    });
+                }
+                
+                res.json({
+                    success: true,
+                    message: 'Notification marked as read'
+                });
+            }
+        );
+    });
+
+    // Get all damage reports
+    app.get('/api/operator/damage-reports', authenticateUser, requireOperator, (req, res) => {
+        const status = req.query.status; // pending, resolved, or all
+        
+        let query = `
+            SELECT dr.*, s.name as station_name 
+            FROM damage_reports dr
+            LEFT JOIN stations s ON dr.station_id = s.id
+        `;
+        
+        if (status && status !== 'all') {
+            query += ' WHERE dr.status = ?';
+        }
+        
+        query += ' ORDER BY dr.reported_at DESC';
+        
+        const params = status && status !== 'all' ? [status] : [];
+        
+        db.all(query, params, (err, reports) => {
+            if (err) {
+                console.error('Error fetching damage reports:', err.message);
+                return res.status(500).json({ 
+                    success: false, 
+                    message: 'Database error' 
+                });
+            }
+            
+            res.json({
+                success: true,
+                reports: reports || [],
+                count: reports ? reports.length : 0
+            });
+        });
+    });
+
+    // Resolve a damage report
+    app.put('/api/operator/damage-reports/:id/resolve', authenticateUser, requireOperator, (req, res) => {
+        const reportId = req.params.id;
+        
+        db.run(
+            'UPDATE damage_reports SET status = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?',
+            ['resolved', reportId],
+            function(err) {
+                if (err) {
+                    console.error('Error resolving damage report:', err.message);
+                    return res.status(500).json({ 
+                        success: false, 
+                        message: 'Database error' 
+                    });
+                }
+                
+                if (this.changes === 0) {
+                    return res.status(404).json({
+                        success: false,
+                        message: 'Damage report not found'
+                    });
+                }
+                
+                res.json({
+                    success: true,
+                    message: 'Damage report marked as resolved'
                 });
             }
         );
@@ -2159,13 +2463,45 @@ function setupRoutes() {
                     maintenanceBikesCount: maintenanceBikes.length,
                     onTripBikesCount: 0, // on_trip bikes don't have station_id, so 0 here
                     
+                    // Grouped bikes for easier client consumption
+                    availableBikes: {
+                        count: availableBikes.length,
+                        bikes: availableBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status,
+                            reservationExpiry: bike.reservation_expiry || null
+                        }))
+                    },
+                    reservedBikes: {
+                        count: reservedBikes.length,
+                        bikes: reservedBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status,
+                            reservationExpiry: bike.reservation_expiry || null
+                        }))
+                    },
+                    maintenanceBikes: {
+                        count: maintenanceBikes.length,
+                        bikes: maintenanceBikes.map(bike => ({
+                            id: bike.id,
+                            type: bike.type,
+                            status: bike.status
+                        }))
+                    },
+                    
                     // Bike type breakdowns (for ALL bikes at station)
                     totalStandardBikes: bikesList.filter(bike => bike.type === 'standard').length,
                     totalEBikes: bikesList.filter(bike => bike.type === 'e-bike').length,
+                    totalBikes: bikesList.length,
                     
                     // Docked bike type breakdowns (excludes maintenance)
                     dockedStandardBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'standard').length,
-                    dockedEBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'e-bike').length
+                    dockedEBikes: [...availableBikes, ...reservedBikes].filter(bike => bike.type === 'e-bike').length,
+                    
+                    // Summary text
+                    summary: `${availableBikes.length} available • ${reservedBikes.length} reserved • ${maintenanceBikes.length} in maintenance`
                 };
             }));
             
