@@ -61,6 +61,11 @@ Deliver a functional system aligned with documented use cases
 - Activity Diagrams
 
 - Package and Class Diagrams
+
+### Link to documentation:
+https://drive.google.com/file/d/1lk3JbIuAyQcq7GDUnzFM8zGn8SzPd2Ju/view?usp=drive_link
+https://drive.google.com/file/d/1kOQCrmGvSbimVs74_45PapdJ0_3nIBZk/view?usp=drive_link
+
   
 ## Contributors:
 - Samy Mezimez 40275766
