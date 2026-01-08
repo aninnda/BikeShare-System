@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import API_URL from '../config';
 import DamageReportNotifications from '../components/DamageReportNotifications';
 import './style/Analytics.css';
 
@@ -31,7 +32,7 @@ const Analytics = () => {
             setLoading(true);
             setError('');
             
-            const response = await fetch('http://localhost:5001/api/rentals/all', {
+            const response = await fetch(`${API_URL}/api/rentals/all`, {
                 headers: {
                     'x-user-id': user.id.toString(),
                     'x-user-role': user.role,

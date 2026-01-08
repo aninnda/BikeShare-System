@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import API_URL from '../config';
 import DamageReportNotifications from '../components/DamageReportNotifications';
 import './style/ManageBikes.css';
 
@@ -49,7 +50,7 @@ const ManageBikes = () => {
     const fetchStations = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await fetch('http://localhost:5001/api/stations/map');
+            const response = await fetch(`${API_URL}/api/stations/map');
             const data = await response.json();
             
             if (data.success) {
@@ -65,7 +66,7 @@ const ManageBikes = () => {
 
     const fetchBikes = useCallback(async () => {
         try {
-            const response = await fetch('http://localhost:5001/api/stations/map');
+            const response = await fetch(`${API_URL}/api/stations/map');
             const data = await response.json();
             
             if (data.success) {
@@ -102,7 +103,7 @@ const ManageBikes = () => {
             
             console.log('Toggling station status:', { stationId, currentStatus, action });
             
-            const response = await fetch(`http://localhost:5001/api/stations/${stationId}/maintenance`, {
+            const response = await fetch(`${API_URL}/api/stations/${stationId}/maintenance`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -135,7 +136,7 @@ const ManageBikes = () => {
             // Use database to update bike status
             const newStatus = currentStatus === 'maintenance' ? 'available' : 'maintenance';
             
-            const response = await fetch(`http://localhost:5001/api/bikes/${bikeId}/status`, {
+            const response = await fetch(`${API_URL}/api/bikes/${bikeId}/status`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -179,7 +180,7 @@ const ManageBikes = () => {
         }
 
         try {
-            const response = await fetch('http://localhost:5001/api/manual-move', {
+            const response = await fetch(`${API_URL}/api/manual-move', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -221,7 +222,7 @@ const ManageBikes = () => {
         }
 
         try {
-            const response = await fetch('http://localhost:5001/api/bikes', {
+            const response = await fetch(`${API_URL}/api/bikes', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

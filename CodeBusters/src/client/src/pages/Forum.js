@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import API_URL from '../config';
 import './style/Forum.css';
 
 const Forum = () => {
@@ -22,7 +23,7 @@ const Forum = () => {
     const fetchPosts = async () => {
         try {
             setError('');
-            const response = await fetch('http://localhost:5001/api/forum/posts');
+            const response = await fetch(`${API_URL}/api/forum/posts`);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -56,7 +57,7 @@ const Forum = () => {
         setSuccess('');
 
         try {
-            const response = await fetch('http://localhost:5001/api/forum/posts', {
+            const response = await fetch(`${API_URL}/api/forum/posts`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

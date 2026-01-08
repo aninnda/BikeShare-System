@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import API_URL from '../config';
 import './style/Leaderboard.css';
 
 const Leaderboard = () => {
@@ -17,7 +18,7 @@ const Leaderboard = () => {
         try {
             setLoading(true);
             setError(null);
-            const response = await fetch('http://localhost:5001/api/leaderboard', {
+            const response = await fetch(`${API_URL}/api/leaderboard`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json',

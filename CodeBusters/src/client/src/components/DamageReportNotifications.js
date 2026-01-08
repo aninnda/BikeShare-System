@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import API_URL from '../config';
 import './style/DamageReportNotifications.css';
 
 const DamageReportNotifications = ({ user }) => {
@@ -17,7 +18,7 @@ const DamageReportNotifications = ({ user }) => {
 
     const fetchNotifications = async () => {
         try {
-            const response = await fetch('http://localhost:5001/api/operator/notifications?unread=true', {
+            const response = await fetch(`${API_URL}/api/operator/notifications?unread=true', {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'x-user-id': String(user.id),
@@ -36,7 +37,7 @@ const DamageReportNotifications = ({ user }) => {
 
     const fetchDamageReports = async () => {
         try {
-            const response = await fetch('http://localhost:5001/api/operator/damage-reports?status=pending', {
+            const response = await fetch(`${API_URL}/api/operator/damage-reports?status=pending', {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'x-user-id': String(user.id),
@@ -55,7 +56,7 @@ const DamageReportNotifications = ({ user }) => {
 
     const markAsRead = async (notificationId) => {
         try {
-            await fetch(`http://localhost:5001/api/operator/notifications/${notificationId}/read`, {
+            await fetch(`${API_URL}/api/operator/notifications/${notificationId}/read`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -72,7 +73,7 @@ const DamageReportNotifications = ({ user }) => {
     const resolveReport = async (reportId) => {
         try {
             setLoading(true);
-            await fetch(`http://localhost:5001/api/operator/damage-reports/${reportId}/resolve`, {
+            await fetch(`${API_URL}/api/operator/damage-reports/${reportId}/resolve`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,

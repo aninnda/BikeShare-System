@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_URL from '../config';
 import './style/Payment.css';
 
 const Payment = ({ selectedPlan, onBack }) => {
@@ -27,7 +28,7 @@ const Payment = ({ selectedPlan, onBack }) => {
             }
             
             try {
-                const url = `http://localhost:5001/api/payment-methods/${user.id}`;
+                const url = `${API_URL}/api/payment-methods/${user.id}`;
                 console.log('Fetching payment method from:', url);
                 
                 const response = await fetch(url, {
@@ -152,7 +153,7 @@ const Payment = ({ selectedPlan, onBack }) => {
                 
                 for (const rentalId of rentalIds) {
                     try {
-                        const response = await fetch('http://localhost:5001/api/payments/charge', {
+                        const response = await fetch(`${API_URL}/api/payments/charge', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -192,7 +193,7 @@ const Payment = ({ selectedPlan, onBack }) => {
             }
             // If this is a single rental payment (has rentalId), call the payment API
             else if (selectedPlan?.rentalId) {
-                const response = await fetch('http://localhost:5001/api/payments/charge', {
+                const response = await fetch(`${API_URL}/api/payments/charge', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import API_URL from '../config';
 import TierNotification from './TierNotification';
 import './style/MyRentals.css';
 
@@ -82,7 +83,7 @@ const MyRentals = () => {
             const user = JSON.parse(localStorage.getItem('user'));
             if (!user) return;
 
-            const response = await fetch(`http://localhost:5001/api/users/${user.id}/rental`);
+            const response = await fetch(`${API_URL}/api/users/${user.id}/rental`);
             const json = await response.json();
             
             if (json && json.success && json.hasActiveRental && json.rental) {
@@ -151,7 +152,7 @@ const MyRentals = () => {
             }
 
             // Get user's reservations directly from the server
-            const response = await fetch(`http://localhost:5001/api/users/${user.id}/reservations`);
+            const response = await fetch(`${API_URL}/api/users/${user.id}/reservations`);
             const data = await response.json();
             
             if (data.success) {
@@ -229,7 +230,7 @@ const MyRentals = () => {
                 return;
             }
 
-            const response = await fetch('http://localhost:5001/api/reserve/cancel', {
+            const response = await fetch(`${API_URL}/api/reserve/cancel', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -264,7 +265,7 @@ const MyRentals = () => {
                 return;
             }
 
-            const response = await fetch('http://localhost:5001/api/rent', {
+            const response = await fetch(`${API_URL}/api/rent', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -331,7 +332,7 @@ const MyRentals = () => {
             setLoading(true);
             
             // Fetch all stations to find ones with available docks
-            const response = await fetch('http://localhost:5001/api/stations/map');
+            const response = await fetch(`${API_URL}/api/stations/map');
             const data = await response.json();
             
             if (data.success) {
@@ -364,7 +365,7 @@ const MyRentals = () => {
                 return;
             }
 
-            const response = await fetch('http://localhost:5001/api/return', {
+            const response = await fetch(`${API_URL}/api/return', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -481,7 +482,7 @@ const MyRentals = () => {
                 return;
             }
 
-            const response = await fetch(`http://localhost:5001/api/bikes/${activeRental.bikeId}/report-damage`, {
+            const response = await fetch(`${API_URL}/api/bikes/${activeRental.bikeId}/report-damage`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

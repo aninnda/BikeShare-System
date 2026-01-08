@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import API_URL from '../config';
 
 // Ride History Component with Filters
 const RideHistory = ({ userId }) => {
@@ -29,7 +30,7 @@ const RideHistory = ({ userId }) => {
             if (bikeTypeFilter && bikeTypeFilter !== 'all') params.append('bikeType', bikeTypeFilter);
             
             const queryString = params.toString();
-            const url = `http://localhost:5001/api/users/${userId}/rides${queryString ? '?' + queryString : ''}`;
+            const url = `${API_URL}/api/users/${userId}/rides${queryString ? '?' + queryString : ''}`;
             
             const response = await fetch(url);
             const data = await response.json();
@@ -404,7 +405,7 @@ const Billing = ({ userId }) => {
     const fetchLocalFlexBalance = useCallback(async () => {
         if (!user?.id) return;
         try {
-            const resp = await fetch('http://localhost:5001/api/flex-dollars/balance', {
+            const resp = await fetch(`${API_URL}/api/flex-dollars/balance', {
                 headers: {
                     'x-user-id': String(user.id),
                     'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
@@ -421,7 +422,7 @@ const Billing = ({ userId }) => {
     const fetchPaymentMethod = useCallback(async () => {
         if (!userId) return;
         try {
-            const resp = await fetch(`http://localhost:5001/api/payment-methods/${userId}`, {
+            const resp = await fetch(`${API_URL}/api/payment-methods/${userId}`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
                 }
@@ -440,7 +441,7 @@ const Billing = ({ userId }) => {
         setLoading(true);
         setError('');
         try {
-            const resp = await fetch(`http://localhost:5001/api/users/${userId}/billing?limit=50`, {
+            const resp = await fetch(`${API_URL}/api/users/${userId}/billing?limit=50`, {
                 headers: {
                     'x-user-id': String(user?.id || ''),
                     'x-user-role': String(user?.role || ''),
@@ -800,7 +801,7 @@ const FlexDollarsHistory = ({ userId, userRole }) => {
             setLoading(true);
             setError('');
 
-            const response = await fetch(`http://localhost:5001/api/flex-dollars/history?limit=50&offset=0`, {
+            const response = await fetch(`${API_URL}/api/flex-dollars/history?limit=50&offset=0`, {
                 headers: {
                     'x-user-id': String(userId),
                     'x-user-role': String(userRole || localStorage.getItem('userRole') || 'rider'),
@@ -902,7 +903,7 @@ const Profile = () => {
     // Fetch flex dollars balance
     const fetchFlexDollarsBalance = async (userId) => {
         try {
-            const response = await fetch('http://localhost:5001/api/flex-dollars/balance', {
+            const response = await fetch(`${API_URL}/api/flex-dollars/balance', {
                 headers: {
                     'x-user-id': String(userId),
                     'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
@@ -923,7 +924,7 @@ const Profile = () => {
         setNotifLoading(true);
         setNotifError('');
         try {
-            const response = await fetch('http://localhost:5001/api/notifications/stations');
+            const response = await fetch(`${API_URL}/api/notifications/stations');
             const data = await response.json();
             if (data.success) {
                 setStationNotifications(data.notifications);
@@ -1035,7 +1036,7 @@ const Profile = () => {
         if (!user?.id) return;
         
         try {
-            const response = await fetch(`http://localhost:5001/api/users/${user.id}/loyalty`, {
+            const response = await fetch(`${API_URL}/api/users/${user.id}/loyalty`, {
                 headers: {
                     'x-user-id': String(user.id),
                     'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
@@ -1110,7 +1111,7 @@ const Profile = () => {
         }
 
         try {
-            const response = await fetch('http://localhost:5001/api/profile/update', {
+            const response = await fetch(`${API_URL}/api/profile/update', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

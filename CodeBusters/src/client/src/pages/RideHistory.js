@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import API_URL from '../config';
 import './RideHistory.css';
 
 /**
@@ -50,7 +51,7 @@ function RideHistory() {
 
             // R-RH-02: Role-based endpoint selection
             if (isOperator) {
-                url = 'http://localhost:5001/api/rides/all';
+                url = `${API_URL}/api/rides/all`;
                 
                 // R-RH-01: Add Trip ID search parameter
                 if (searchTripId.trim()) {
@@ -71,7 +72,7 @@ function RideHistory() {
                 }
             } else {
                 // Riders see only their own rides
-                url = `http://localhost:5001/api/users/${userId}/rides`;
+                url = `${API_URL}/api/users/${userId}/rides`;
             }
 
             const queryString = params.toString();

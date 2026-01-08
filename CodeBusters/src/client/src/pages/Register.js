@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import API_URL from '../config';
 import './style/Register.css';
 
 const Register = () => {
@@ -134,7 +135,7 @@ const Register = () => {
         }
 
         try {
-            const response = await fetch('http://localhost:5001/api/register', {
+            const response = await fetch(`${API_URL}/api/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
