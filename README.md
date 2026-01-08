@@ -1,11 +1,7 @@
 # 🚴 Bike Sharing Management System
 
 > A full-stack, production-ready bike-sharing platform demonstrating enterprise software architecture, real-time data management, and cloud deployment expertise.
-
-[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://bike-share-system.vercel.app)
-[![Frontend](https://img.shields.io/badge/frontend-Vercel-black)](https://bike-share-system.vercel.app)
-[![Backend](https://img.shields.io/badge/backend-Render-46E3B7)](https://bikeshare-system.onrender.com)
-
+> 
 **🌐 Live Application:** [bike-share-system.vercel.app](https://bike-share-system.vercel.app)
 
 ---
@@ -181,17 +177,21 @@ REACT_APP_API_URL=http://localhost:5001
 
 ## 🧪 Testing the Application
 
-### Create a Rider Account
-1. Navigate to the live site or local instance
-2. Click "Register"
-3. Fill in user details and payment information
-4. Start reserving bikes!
+### Test Credentials
 
-### Operator Access
+#### Rider Account
+- **Username:** `hello`
+- **Password:** `hello`
+
+Or create your own by registering on the live site!
+
+#### Operator Account
+- **Username:** `ops`
+- **Password:** `ops`
+
+#### Dual Role Account (Rider + Operator)
 - **Username:** `demo_operator`
-- **Role:** Dual (Rider + Operator capabilities)
-- Contact the development team for credentials
-
+- **Password:** `password 123`
 ---
 
 ## 📚 Software Engineering Principles
@@ -200,8 +200,8 @@ REACT_APP_API_URL=http://localhost:5001
 - **UML Diagrams:** Context, Domain Model, Use Case, Sequence, Activity, Class diagrams
 - **Architectural Patterns:** Layered architecture, MVC, Service-oriented design
 - **Documentation Links:**
-  - [Phase 1 Documentation →](https://drive.google.com/file/d/1lk3JbIuAyQcq7GDUnzFM8zGn8SzPd2Ju/view?usp=drive_link)
-  - [Phase 2 Documentation →](https://drive.google.com/file/d/1kOQCrmGvSbimVs74_45PapdJ0_3nIBZk/view?usp=drive_link)
+  - [Phase 3 Documentation →](https://drive.google.com/file/d/1lk3JbIuAyQcq7GDUnzFM8zGn8SzPd2Ju/view?usp=drive_link)
+  - [Phase 4 Documentation →](https://drive.google.com/file/d/1kOQCrmGvSbimVs74_45PapdJ0_3nIBZk/view?usp=drive_link)
 
 ### Best Practices Implemented
 - ✅ RESTful API design principles
