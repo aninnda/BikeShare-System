@@ -153,7 +153,7 @@ const Payment = ({ selectedPlan, onBack }) => {
                 
                 for (const rentalId of rentalIds) {
                     try {
-                        const response = await fetch(`${API_URL}/api/payments/charge', {
+                        const response = await fetch(`${API_URL}/api/payments/charge`, {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -193,7 +193,7 @@ const Payment = ({ selectedPlan, onBack }) => {
             }
             // If this is a single rental payment (has rentalId), call the payment API
             else if (selectedPlan?.rentalId) {
-                const response = await fetch(`${API_URL}/api/payments/charge', {
+                const response = await fetch(`${API_URL}/api/payments/charge`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

@@ -21,7 +21,7 @@ const AvailableBikes = () => {
         const loadAllStations = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_URL}/api/stations/map');
+                const response = await fetch(`${API_URL}/api/stations/map`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -57,7 +57,7 @@ const AvailableBikes = () => {
                 const user = JSON.parse(localStorage.getItem('user'));
                 if (!user) return;
 
-                const response = await fetch(`${API_URL}/api/stations/map');
+                const response = await fetch(`${API_URL}/api/stations/map`);
                 const data = await response.json();
                 
                 if (data.success) {
@@ -181,7 +181,7 @@ const AvailableBikes = () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/api/reserve', {
+            const response = await fetch(`${API_URL}/api/reserve`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -205,7 +205,7 @@ const AvailableBikes = () => {
                 if (searchQuery.trim()) {
                     handleSearch(searchQuery);
                 } else {
-                    const stationsResponse = await fetch(`${API_URL}/api/stations/map');
+                    const stationsResponse = await fetch(`${API_URL}/api/stations/map`);
                     const stationsData = await stationsResponse.json();
                     if (stationsData.success) {
                         setStations(stationsData.stations);
@@ -254,7 +254,7 @@ const AvailableBikes = () => {
 
             // Pre-flight: fetch latest station info to avoid posting stale rent requests
             try {
-                const latest = await fetch(`${API_URL}/api/stations/map');
+                const latest = await fetch(`${API_URL}/api/stations/map`);
                 const latestData = await latest.json();
                 if (latestData && latestData.success) {
                     const stationNow = latestData.stations.find(s => s.id === stationId);
@@ -339,7 +339,7 @@ const AvailableBikes = () => {
             setSearchResults(prev => markBikeOnTrip(prev));
 
             // Now perform the actual rent call
-            const response = await fetch(`${API_URL}/api/rent', {
+            const response = await fetch(`${API_URL}/api/rent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -368,7 +368,7 @@ const AvailableBikes = () => {
                         if (searchQuery.trim()) {
                             await handleSearch(searchQuery);
                         } else {
-                            const stationsResponse = await fetch(`${API_URL}/api/stations/map');
+                            const stationsResponse = await fetch(`${API_URL}/api/stations/map`);
                             const stationsData = await stationsResponse.json();
                             if (stationsData.success) {
                                 setStations(stationsData.stations);
@@ -381,7 +381,7 @@ const AvailableBikes = () => {
             } else {
                 // Server rejected the rent: rollback optimistic state
                 try {
-                    const stationsResponse = await fetch(`${API_URL}/api/stations/map');
+                    const stationsResponse = await fetch(`${API_URL}/api/stations/map`);
                     const stationsData = await stationsResponse.json();
                     if (stationsData.success) {
                         setStations(stationsData.stations);
@@ -415,7 +415,7 @@ const AvailableBikes = () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/api/return', {
+            const response = await fetch(`${API_URL}/api/return`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -459,7 +459,7 @@ const AvailableBikes = () => {
                 if (searchQuery.trim()) {
                     handleSearch(searchQuery);
                 } else {
-                    const stationsResponse = await fetch(`${API_URL}/api/stations/map');
+                    const stationsResponse = await fetch(`${API_URL}/api/stations/map`);
                     const stationsData = await stationsResponse.json();
                     if (stationsData.success) {
                         setStations(stationsData.stations);
@@ -484,7 +484,7 @@ const AvailableBikes = () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/api/reserve/cancel', {
+            const response = await fetch(`${API_URL}/api/reserve/cancel`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -508,7 +508,7 @@ const AvailableBikes = () => {
                 if (searchQuery.trim()) {
                     handleSearch(searchQuery);
                 } else {
-                    const stationsResponse = await fetch(`${API_URL}/api/stations/map');
+                    const stationsResponse = await fetch(`${API_URL}/api/stations/map`);
                     const stationsData = await stationsResponse.json();
                     if (stationsData.success) {
                         setStations(stationsData.stations);

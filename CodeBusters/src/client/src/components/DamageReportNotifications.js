@@ -18,7 +18,7 @@ const DamageReportNotifications = ({ user }) => {
 
     const fetchNotifications = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/operator/notifications?unread=true', {
+            const response = await fetch(`${API_URL}/api/operator/notifications?unread=true`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'x-user-id': String(user.id),
@@ -37,7 +37,7 @@ const DamageReportNotifications = ({ user }) => {
 
     const fetchDamageReports = async () => {
         try {
-            const response = await fetch(`${API_URL}/api/operator/damage-reports?status=pending', {
+            const response = await fetch(`${API_URL}/api/operator/damage-reports?status=pending`, {
                 headers: {
                     'Authorization': `Bearer ${localStorage.getItem('token')}`,
                     'x-user-id': String(user.id),

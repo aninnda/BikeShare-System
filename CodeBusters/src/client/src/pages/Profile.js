@@ -405,7 +405,7 @@ const Billing = ({ userId }) => {
     const fetchLocalFlexBalance = useCallback(async () => {
         if (!user?.id) return;
         try {
-            const resp = await fetch(`${API_URL}/api/flex-dollars/balance', {
+            const resp = await fetch(`${API_URL}/api/flex-dollars/balance`, {
                 headers: {
                     'x-user-id': String(user.id),
                     'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
@@ -903,7 +903,7 @@ const Profile = () => {
     // Fetch flex dollars balance
     const fetchFlexDollarsBalance = async (userId) => {
         try {
-            const response = await fetch(`${API_URL}/api/flex-dollars/balance', {
+            const response = await fetch(`${API_URL}/api/flex-dollars/balance`, {
                 headers: {
                     'x-user-id': String(userId),
                     'x-user-role': String(user?.role || localStorage.getItem('userRole') || 'rider'),
@@ -924,7 +924,7 @@ const Profile = () => {
         setNotifLoading(true);
         setNotifError('');
         try {
-            const response = await fetch(`${API_URL}/api/notifications/stations');
+            const response = await fetch(`${API_URL}/api/notifications/stations`);
             const data = await response.json();
             if (data.success) {
                 setStationNotifications(data.notifications);
@@ -1111,7 +1111,7 @@ const Profile = () => {
         }
 
         try {
-            const response = await fetch(`${API_URL}/api/profile/update', {
+            const response = await fetch(`${API_URL}/api/profile/update`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

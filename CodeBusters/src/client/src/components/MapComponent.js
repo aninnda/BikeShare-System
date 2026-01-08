@@ -198,7 +198,7 @@ const MapComponent = () => {
             setLoading(true);
             
             // Fetch stations
-            const stationsResponse = await fetch(`${API_URL}/api/stations/map');
+            const stationsResponse = await fetch(`${API_URL}/api/stations/map`);
             if (!stationsResponse.ok) {
                 throw new Error('Failed to fetch stations');
             }
@@ -206,7 +206,7 @@ const MapComponent = () => {
             setStations(stationsData.stations || []);
 
             // Fetch bikes
-            const bikesResponse = await fetch(`${API_URL}/api/bikes/map');
+            const bikesResponse = await fetch(`${API_URL}/api/bikes/map`);
             if (!bikesResponse.ok) {
                 throw new Error('Failed to fetch bikes');
             }

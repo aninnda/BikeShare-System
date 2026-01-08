@@ -230,7 +230,7 @@ const MyRentals = () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/api/reserve/cancel', {
+            const response = await fetch(`${API_URL}/api/reserve/cancel`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -265,7 +265,7 @@ const MyRentals = () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/api/rent', {
+            const response = await fetch(`${API_URL}/api/rent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -332,7 +332,7 @@ const MyRentals = () => {
             setLoading(true);
             
             // Fetch all stations to find ones with available docks
-            const response = await fetch(`${API_URL}/api/stations/map');
+            const response = await fetch(`${API_URL}/api/stations/map`);
             const data = await response.json();
             
             if (data.success) {
@@ -365,7 +365,7 @@ const MyRentals = () => {
                 return;
             }
 
-            const response = await fetch(`${API_URL}/api/return', {
+            const response = await fetch(`${API_URL}/api/return`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

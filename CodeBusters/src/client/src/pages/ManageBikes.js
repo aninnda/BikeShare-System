@@ -50,7 +50,7 @@ const ManageBikes = () => {
     const fetchStations = useCallback(async () => {
         try {
             setLoading(true);
-            const response = await fetch(`${API_URL}/api/stations/map');
+            const response = await fetch(`${API_URL}/api/stations/map`);
             const data = await response.json();
             
             if (data.success) {
@@ -66,7 +66,7 @@ const ManageBikes = () => {
 
     const fetchBikes = useCallback(async () => {
         try {
-            const response = await fetch(`${API_URL}/api/stations/map');
+            const response = await fetch(`${API_URL}/api/stations/map`);
             const data = await response.json();
             
             if (data.success) {
@@ -180,7 +180,7 @@ const ManageBikes = () => {
         }
 
         try {
-            const response = await fetch(`${API_URL}/api/manual-move', {
+            const response = await fetch(`${API_URL}/api/manual-move`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -222,7 +222,7 @@ const ManageBikes = () => {
         }
 
         try {
-            const response = await fetch(`${API_URL}/api/bikes', {
+            const response = await fetch(`${API_URL}/api/bikes`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
