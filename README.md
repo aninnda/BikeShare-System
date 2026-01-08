@@ -1,8 +1,20 @@
-# Project Overview
+# 🚴 Bike Sharing Management System
+
+> A full-stack, production-ready bike-sharing platform demonstrating enterprise software architecture, real-time data management, and cloud deployment expertise.
+
+[![Live Demo](https://img.shields.io/badge/demo-live-success)](https://bike-share-system.vercel.app)
+[![Frontend](https://img.shields.io/badge/frontend-Vercel-black)](https://bike-share-system.vercel.app)
+[![Backend](https://img.shields.io/badge/backend-Render-46E3B7)](https://bikeshare-system.onrender.com)
+
+**🌐 Live Application:** [bike-share-system.vercel.app](https://bike-share-system.vercel.app)
+
+---
+
+## 📋 Project Overview
 
 Enterprise-grade Bike Sharing Management System (BMS) developed as part of **SOEN 343 – Software Architecture and Design** at Concordia University. This full-stack application simulates a real-world bike-sharing service with robust architecture, implementing industry best practices in software design patterns, RESTful API development, and cloud deployment.
 
-## Key Achievements
+### 🎯 Key Achievements
 - ✅ **Full-Stack Development:** React frontend + Node.js/Express backend
 - ✅ **Cloud Deployment:** Successfully deployed on Vercel (frontend) and Render (backend)
 - ✅ **Real-Time System:** Live bike availability tracking and reservation management
@@ -10,7 +22,19 @@ Enterprise-grade Bike Sharing Management System (BMS) developed as part of **SOE
 - ✅ **Scalable Architecture:** Clean separation of concerns with layered design patterns
 - ✅ **Production-Ready:** CORS configuration, environment management, and error handling
 
-## Technical Highlights
+---
+
+## 🚀 Live Deployment
+
+| Component | Platform | URL |
+|-----------|----------|-----|
+| **Frontend** | Vercel | [bike-share-system.vercel.app](https://bike-share-system.vercel.app) |
+| **Backend API** | Render | [bikeshare-system.onrender.com](https://bikeshare-system.onrender.com) |
+| **Repository** | GitHub | [BikeShare-System](https://github.com/aninnda/BikeShare-System) |
+
+---
+
+## 💼 Technical Highlights
 
 ### Architecture & Design Patterns
 - **Layered Architecture:** Presentation → Business Logic → Data Access
@@ -27,6 +51,9 @@ Enterprise-grade Bike Sharing Management System (BMS) developed as part of **SOE
 - 🔔 **Notification System:** Real-time alerts for reservations, damage reports, and system events
 - 📱 **Responsive Design:** Mobile-first approach with modern CSS
 
+- 📱 **Responsive Design:** Mobile-first approach with modern CSS
+
+---
 
 ## 🛠️ Technology Stack
 
@@ -172,9 +199,9 @@ REACT_APP_API_URL=http://localhost:5001
 ### Design Documentation
 - **UML Diagrams:** Context, Domain Model, Use Case, Sequence, Activity, Class diagrams
 - **Architectural Patterns:** Layered architecture, MVC, Service-oriented design
-- **Documentation:** [View Full Documentation →](https://drive.google.com/file/d/1lk3JbIuAyQcq7GDUnzFM8zGn8SzPd2Ju/view?usp=drive_link)
-                      [View Full Documentation →](https://drive.google.com/file/d/1lk3JbIuAyQcq7GDUnzFM8zGn8SzPd2Ju/view?usp=drive_link)
-
+- **Documentation Links:**
+  - [Phase 1 Documentation →](https://drive.google.com/file/d/1lk3JbIuAyQcq7GDUnzFM8zGn8SzPd2Ju/view?usp=drive_link)
+  - [Phase 2 Documentation →](https://drive.google.com/file/d/1kOQCrmGvSbimVs74_45PapdJ0_3nIBZk/view?usp=drive_link)
 
 ### Best Practices Implemented
 - ✅ RESTful API design principles
@@ -187,13 +214,18 @@ REACT_APP_API_URL=http://localhost:5001
 
 ---
 
-## 🚀 Live Deployment
+## 🎓 Academic Context
 
-| Component | Platform | URL |
-|-----------|----------|-----|
-| **Frontend** | Vercel | [bike-share-system.vercel.app](https://bike-share-system.vercel.app) |
-| **Backend API** | Render | [bikeshare-system.onrender.com](https://bikeshare-system.onrender.com) |
-| **Repository** | GitHub | [BikeShare-System](https://github.com/aninnda/BikeShare-System) |
+**Course:** SOEN 343 – Software Architecture and Design  
+**Institution:** Concordia University  
+**Focus Areas:**
+- Object-Oriented Design & Analysis
+- Software Architecture Patterns
+- UML Modeling & Documentation
+- Full-Stack Development
+- Agile Development Methodology
+
+---
 
 ## 👨‍💻 Contributors
 
@@ -204,4 +236,8 @@ REACT_APP_API_URL=http://localhost:5001
 | **Aninnda Kumar Datta** | **40298954** |
 | Sitherankan Sinnappu | 40264048 |
 | Hong Phuc Paul Pham | 40264687 |
+
+---
+
+<p align="center">Made with ❤️ by the CodeBusters Team</p>
 
